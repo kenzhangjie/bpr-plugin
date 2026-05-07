@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Notion × Latent Space — Custom Agents / Evals / Future of Work 总结</title>
+<style>
+  :root {
+    --bg: #0B0F19;
+    --bg-2: #131A2B;
+    --card: #1A2337;
+    --card-2: #1E2842;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.15);
+    --text: #F8FAFC;
+    --text-dim: #CBD5E1;
+    --text-faint: #94A3B8;
+    --accent: #F97316;
+    --accent-2: #8B5CF6;
+    --accent-3: #22D3EE;
+    --green: #10B981;
+    --red: #EF4444;
+    --shadow: 0 20px 40px -10px rgba(0,0,0,0.5);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body {
+    font-family: "PingFang SC", "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    width: 1080px;
+    margin: 0 auto;
+    padding: 0;
+    overflow-x: hidden;
+  }
+  .page {
+    width: 1080px;
+    padding: 72px 64px 64px;
+    position: relative;
+    background:
+      radial-gradient(circle at 85% 0%, rgba(139,92,246,0.15), transparent 40%),
+      radial-gradient(circle at 15% 100%, rgba(249,115,22,0.12), transparent 40%),
+      var(--bg);
+  }
+  /* 水印层已移除（BPR /bpr 海报模式默认无水印） */
+  .page > * { position: relative; z-index: 1; }
+  /* ============ HERO ============ */
+  .hero { margin-bottom: 80px; }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, rgba(249,115,22,0.15), rgba(139,92,246,0.15));
+    border: 1px solid rgba(249,115,22,0.3);
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+  .eyebrow .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+  }
+  h1.title {
+    font-size: 58px;
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    margin-bottom: 24px;
+    background: linear-gradient(135deg, #FFFFFF 0%, #CBD5E1 60%, #94A3B8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .title-cn {
+    font-size: 26px;
+    font-weight: 500;
+    color: var(--text-dim);
+    margin-bottom: 40px;
+    line-height: 1.4;
+  }
+  .author-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+  }
+  .avatar {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 22px;
+    color: white;
+  }
+  .author-info .name {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .author-info .handle {
+    font-size: 14px;
+    color: var(--text-faint);
+  }
+  .meta {
+    margin-left: auto;
+    display: flex;
+    gap: 24px;
+    font-size: 13px;
+    color: var(--text-faint);
+  }
+  .meta b { color: var(--text); font-weight: 600; font-size: 14px; }
+
+  /* ============ SECTIONS ============ */
+  section { margin-bottom: 72px; }
+  .section-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent-3);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  h2 {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 28px;
+    line-height: 1.2;
+  }
+  .subtle { color: var(--text-dim); font-size: 16px; line-height: 1.7; }
+
+  /* ============ STATS ============ */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .stat {
+    background: linear-gradient(180deg, var(--card) 0%, var(--card-2) 100%);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 32px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  }
+  .stat .num {
+    font-size: 56px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+  }
+  .stat .label {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .stat .sublabel {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  /* ============ BIG THESIS ============ */
+  .thesis {
+    background: linear-gradient(135deg, rgba(249,115,22,0.1), rgba(139,92,246,0.1));
+    border: 1px solid var(--border-strong);
+    border-radius: 28px;
+    padding: 48px;
+  }
+  .thesis .equation {
+    font-size: 44px;
+    font-weight: 800;
+    margin-bottom: 24px;
+    text-align: center;
+    letter-spacing: -1px;
+  }
+  .thesis .equation .dim { color: var(--text-faint); }
+  .thesis .equation .neq { color: var(--red); }
+  .thesis .equation .strong {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 32px;
+  }
+  .compare-card {
+    padding: 24px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+  }
+  .compare-card.bad { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.2); }
+  .compare-card.good { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.2); }
+  .compare-card .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  .compare-card.bad .tag { background: rgba(239,68,68,0.2); color: #FCA5A5; }
+  .compare-card.good .tag { background: rgba(16,185,129,0.2); color: #6EE7B7; }
+  .compare-card .head {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .compare-card .body {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  /* ============ BOTTLENECKS TABLE ============ */
+  .bottle-grid {
+    display: grid;
+    grid-template-columns: 160px 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+  .bottle-head, .bottle-cell {
+    background: var(--card);
+    padding: 20px 22px;
+  }
+  .bottle-head {
+    background: var(--card-2);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+  }
+  .bottle-cell .name {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .bottle-cell .detail {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .bottle-cell.old .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(239,68,68,0.15);
+    color: #FCA5A5;
+    margin-bottom: 8px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .bottle-cell.new .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(16,185,129,0.15);
+    color: #6EE7B7;
+    margin-bottom: 8px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  /* ============ ARCHITECTURE ============ */
+  .arch-card {
+    background: linear-gradient(135deg, var(--card), var(--card-2));
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 40px;
+  }
+  .arch-before-after {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr;
+    gap: 20px;
+    align-items: center;
+    margin-top: 28px;
+  }
+  .arch-box {
+    padding: 24px;
+    border-radius: 16px;
+    text-align: center;
+    font-size: 13px;
+  }
+  .arch-box.before {
+    background: rgba(239,68,68,0.08);
+    border: 1px dashed rgba(239,68,68,0.3);
+  }
+  .arch-box.after {
+    background: rgba(139,92,246,0.1);
+    border: 1px solid rgba(139,92,246,0.4);
+  }
+  .arch-box .big {
+    font-size: 26px;
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+  .arch-box .desc {
+    color: var(--text-dim);
+  }
+  .arrow {
+    text-align: center;
+    font-size: 28px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* ============ STACK ============ */
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  .stack-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  .stack-item .head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .stack-item .emoji {
+    font-size: 22px;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(139,92,246,0.1);
+    border-radius: 10px;
+  }
+  .stack-item .role {
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .stack-item .role-sub {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-top: 2px;
+  }
+  .stack-item .body {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .stack-item.wide { grid-column: span 2; }
+
+  /* ============ ROLES ============ */
+  .roles {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+  .role-card {
+    padding: 30px;
+    border-radius: 22px;
+    position: relative;
+    overflow: hidden;
+  }
+  .role-card.a {
+    background: linear-gradient(160deg, #2D1B4E, #1A1440);
+    border: 1px solid rgba(139,92,246,0.3);
+  }
+  .role-card.b {
+    background: linear-gradient(160deg, #4A2511, #30180D);
+    border: 1px solid rgba(249,115,22,0.3);
+  }
+  .role-card.c {
+    background: linear-gradient(160deg, #0E3A3A, #0A2424);
+    border: 1px solid rgba(34,211,238,0.3);
+  }
+  .role-card .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    letter-spacing: 2px;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+  .role-card.a .badge { background: rgba(139,92,246,0.25); color: #C4B5FD; }
+  .role-card.b .badge { background: rgba(249,115,22,0.25); color: #FDBA74; }
+  .role-card.c .badge { background: rgba(34,211,238,0.25); color: #67E8F9; }
+  .role-card .role-title {
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 6px;
+  }
+  .role-card .role-count {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-bottom: 16px;
+  }
+  .role-card .role-body {
+    font-size: 13.5px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  /* ============ QUOTES ============ */
+  .quotes { display: flex; flex-direction: column; gap: 16px; }
+  .quote {
+    padding: 28px 32px;
+    background: var(--card);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 16px 16px 0;
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1.6;
+    font-style: italic;
+  }
+  .quote.alt { border-left-color: var(--accent-2); }
+  .quote.third { border-left-color: var(--accent-3); }
+
+  /* ============ TAKEAWAYS ============ */
+  .takeaways {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .takeaway {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px 24px;
+  }
+  .takeaway .who {
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  .takeaway .content {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+  .takeaway ul { list-style: none; padding: 0; }
+  .takeaway li {
+    padding-left: 16px;
+    position: relative;
+    margin-bottom: 10px;
+  }
+  .takeaway li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 9px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* ============ HUMAN SIDE ============ */
+  .human-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  .human-card {
+    padding: 24px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+  .human-card .icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+  .human-card .h {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .human-card .p {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  /* ============ FOOTER ============ */
+  footer {
+    margin-top: 24px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+  footer .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+  }
+  footer .brand .logo {
+    width: 24px; height: 24px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-radius: 6px;
+  }
+  .link {
+    font-family: "SF Mono", ui-monospace, Menlo, Monaco, monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- HERO -->
+  <div class="hero">
+    <div style="margin-bottom:28px">
+      <span class="eyebrow"><span class="dot"></span><!-- {kicker} 例:Lenny's Podcast · 2026-05-07 / Andrew Chen Blog · Essay --></span>
+    </div>
+    <h1 class="title">Notion × Latent Space — Custom Agents, Evals &amp; the Future of Work</h1>
+    <div class="title-cn">Notion 的 Simon Last &amp; Sarah Sachs 深谈：<br>把 agent 做成产品、用 "Notion 最后的考试" 当北极星、以及 AI 时代的组织设计</div>
+    <div class="author-row">
+      <div class="avatar">L</div>
+      <div class="author-info">
+        <div class="name">Latent Space <span style="color:var(--accent-3)">✓</span></div>
+        <div class="handle">@latentspacepod · 嘉宾：Simon Last（联合创始人/CTO）· Sarah Sachs（AI Capabilities 负责人）</div>
+      </div>
+      <div class="meta">
+        <div><b>~2h</b><br>时长</div>
+        <div><b>19K</b><br>字幕词数</div>
+        <div><b>Apr 2026</b><br>最新一期</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <section>
+    <div class="section-label">01 · 数字先行</div>
+    <h2>Notion AI 团队的现状，几个让人眼前一亮的数</h2>
+    <div class="stats">
+      <div class="stat">
+        <div class="num">50+</div>
+        <div class="label">核心 AI 能力与基础设施团队</div>
+        <div class="sublabel">外加 30–40 人做"包装"层（Chat/Custom Agents/Meeting Notes）</div>
+      </div>
+      <div class="stat">
+        <div class="num">3 档</div>
+        <div class="label">Eval 分层：Unit · Launch · Frontier</div>
+        <div class="sublabel">目标通过率分别是 CI 门槛 / 80–90% / <b>30%</b>（故意做不过）</div>
+      </div>
+      <div class="stat">
+        <div class="num">15 min</div>
+        <div class="label">一个 Custom Agent 的平均搭建时间</div>
+        <div class="sublabel">Alessio 现场搭了一个租客/邮件处理 agent</div>
+      </div>
+    </div>
+    <p class="subtle" style="margin-top:24px">
+      Notion 的一个判断：<b>长期看，大多数流量会来自 agent，而不是人</b>。所以每一个产品团队（editor / 数据库 / SQL 引擎 / CRDT）都要为「人」和「agent」两套用户写工具。
+    </p>
+  </section>
+
+  <!-- THESIS -->
+  <section>
+    <div class="section-label">02 · 核心论点</div>
+    <h2>Notion 不是给工作加 AI，而是让 AI 来重排流程</h2>
+    <div class="thesis">
+      <div class="equation">
+        <span class="dim">替换人</span> <span class="neq">≠</span> <span class="strong">替换流程</span>
+      </div>
+      <p class="subtle" style="text-align:center;max-width:760px;margin:0 auto;">
+        Sarah 的原话："<b>It's not replacing people, it's replacing processes.</b>"<br>
+        Custom Agent 不是裁员工具，而是把「Slack 里的 bug 报告」「邮件里的租客申请」「合同的起草」这些
+        <b>流程</b>直接装进 Notion——人还在，但处理路径变了。
+      </p>
+      <div class="compare">
+        <div class="compare-card bad">
+          <span class="tag">WRAPPER 幻觉</span>
+          <div class="head">"Notion 不就是个 ChatGPT 包装？"</div>
+          <div class="body">
+            这是 Sarah 拿来<b>反复给候选人解释</b>的问题。她的 Chrome 自动补全里就有这段拒答。
+            真相是：包装层只是表皮，<b>不产生收入</b>，也不是用户真正需要的。
+          </div>
+        </div>
+        <div class="compare-card good">
+          <span class="tag">系统级定位</span>
+          <div class="head">Datadog 对 AWS，就是 Notion 对 LLM</div>
+          <div class="body">
+            Datadog 建在云存储之上，但它是"<b>可观测性专家</b>"。<br>
+            Notion 建在模型之上，但它是"<b>协作与知识的 system of record</b>"——<br>
+            模型在换，协作的专业度不换。
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOTTLENECKS -->
+  <section>
+    <div class="section-label">03 · Agent 架构演化</div>
+    <h2>从一条 prompt 到「工具海 + 渐进披露」</h2>
+    <div class="bottle-grid">
+      <div class="bottle-head">演化阶段</div>
+      <div class="bottle-head">过去的做法</div>
+      <div class="bottle-head">当前的做法</div>
+
+      <div class="bottle-cell"><div class="name">Prompt 形态</div><div class="detail" style="color:var(--text-faint);font-size:12px">One-shot → Tools-only</div></div>
+      <div class="bottle-cell old"><span class="tag">OLD</span><div class="detail">一次性 prompt + <b>few-shot 示例</b>，靠样例教模型按模式回应。</div></div>
+      <div class="bottle-cell new"><span class="tag">NEW</span><div class="detail">"<b>没有 few-shot</b>"。只给工具定义，模型已经能 instruction-follow 得很好。</div></div>
+
+      <div class="bottle-cell"><div class="name">工具暴露</div><div class="detail" style="color:var(--text-faint);font-size:12px">Tool Discovery</div></div>
+      <div class="bottle-cell old"><span class="tag">OLD</span><div class="detail">把 <b>所有工具</b> 塞进 context，工具一多（100+）立刻退化。</div></div>
+      <div class="bottle-cell new"><span class="tag">NEW</span><div class="detail"><b>Progressive disclosure</b>（即将上线）：先过滤，再暴露相关子集。Simon 亲自在推的关键改造。</div></div>
+
+      <div class="bottle-cell"><div class="name">Retrieval</div><div class="detail" style="color:var(--text-faint);font-size:12px">Agentic Find</div></div>
+      <div class="bottle-cell old"><span class="tag">OLD</span><div class="detail">调整 vector embedding，把 ranking 当核心问题。</div></div>
+      <div class="bottle-cell new"><span class="tag">NEW</span><div class="detail">并行发 <b>8 路查询</b>，让模型去写 query 多样性。Ranking/检索/query 生成是<b>同一队人</b>的同一条 journey。</div></div>
+    </div>
+    <p class="subtle" style="margin-top:20px;font-style:italic">
+      🧭 Simon 的元观察：<b>"你会一层层剥掉脚手架，最后它越来越像 AGI。"</b>
+    </p>
+  </section>
+
+  <!-- ARCHITECTURE / FLIPPY -->
+  <section>
+    <div class="section-label">04 · 产品决策</div>
+    <h2>Flippy：把"设置 Agent"改成"和 Agent 聊天"</h2>
+    <div class="arch-card">
+      <p class="subtle">
+        Custom Agents 原本的主视图是<b>设置面板</b>，你去配置它要做什么。团队在 alpha 后把整个范式翻过来了——主视图是<b>聊天</b>，Agent 本身能通过对话<b>自己改自己的设置</b>。内部代号叫 <b style="color:var(--accent-3)">Flippy</b>，因为「Flip」了主次关系。
+      </p>
+      <div class="arch-before-after">
+        <div class="arch-box before">
+          <div class="big">⚙️ Settings 为主</div>
+          <div class="desc">用户先填表单，<br>再去聊一条对话测试它</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="arch-box after">
+          <div class="big">💬 Chat 为主</div>
+          <div class="desc">"Everything is the agent"——<br>编辑它、使用它是<b>同一个对话框</b></div>
+        </div>
+      </div>
+      <p class="subtle" style="margin-top:24px;text-align:center;font-size:14px">
+        发布因此推迟了约一个月。"<b>Painful for a second, then everyone was super bullish.</b>"
+        跨 3 个团队的 3 个工程师临时重组成专项小组推完。
+      </p>
+    </div>
+  </section>
+
+  <!-- STACK -->
+  <section>
+    <div class="section-label">05 · 技术选择</div>
+    <h2>MCP、CLI、模型三角：为什么都要</h2>
+    <div class="stack-grid">
+      <div class="stack-item">
+        <div class="head">
+          <div class="emoji">🔌</div>
+          <div>
+            <div class="role">MCP</div>
+            <div class="role-sub">"The dumb simple thing that works"</div>
+          </div>
+        </div>
+        <div class="body">强权限模型（只能调工具）、lightweight、窄场景最好用。Notion <b>把自己的 MCP 当 first-class 资产</b>——只要外部还在用，我就一定支持。</div>
+      </div>
+      <div class="stack-item">
+        <div class="head">
+          <div class="emoji">⌨️</div>
+          <div>
+            <div class="role">CLI</div>
+            <div class="role-sub">为「代码 agent」准备</div>
+          </div>
+        </div>
+        <div class="body">能力更强，但权限/令牌泄漏风险真实存在。"能直接写代码调 API 的话，<b>我永远不会再用 MCP</b>"。两条路并行，不是二选一。</div>
+      </div>
+      <div class="stack-item">
+        <div class="head">
+          <div class="emoji">🗄️</div>
+          <div>
+            <div class="role">SQLite 集群</div>
+            <div class="role-sub">Notion 数据库底层</div>
+          </div>
+        </div>
+        <div class="body">"几百万个小数据库、少数巨型数据库，还要全部很快"。Agent 提交 SQL 时，跑在同一个为人设计的引擎上——<b>没有 agent 专用数据库</b>。</div>
+      </div>
+      <div class="stack-item">
+        <div class="head">
+          <div class="emoji">📐</div>
+          <div>
+            <div class="role">模型三角</div>
+            <div class="role-sub">Intelligence / Price / Latency</div>
+          </div>
+        </div>
+        <div class="body">Labs 只比"谁最便宜、谁最强"，<b>中间价位没人填</b>。Notion 接 MiniMax、和开源实验室合作，自己做 optionality 以填这个三角。</div>
+      </div>
+      <div class="stack-item wide">
+        <div class="head">
+          <div class="emoji">💰</div>
+          <div>
+            <div class="role">定价的第二层含义</div>
+            <div class="role-sub">Value alignment with capability</div>
+          </div>
+        </div>
+        <div class="body">
+          Custom Agents 采用 <b>usage-based</b> 定价。一条原则：<b>确定性任务就该走代码，不该烧 token</b>。
+          同样的工作用 LLM 反复 MCP，"如果还跳出缓存窗口，就要一遍遍重付"——既对用户不划算，也不是好生意。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROLES — Notion's Last Exam team -->
+  <section>
+    <div class="section-label">06 · 新职位</div>
+    <h2>「Notion's Last Exam」的三个全职岗</h2>
+    <div class="roles">
+      <div class="role-card a">
+        <span class="badge">DATA SCIENTIST</span>
+        <div class="role-title">数据科学家</div>
+        <div class="role-count">1 人 · 全职负责 eval 集设计</div>
+        <div class="role-body">
+          定义什么是"Notion 最后的考试"——像 <b>Humanity's Last Exam</b> 一样的基准，专门用来把现有 eval 饱和后的"没信号"阶段拉回到有判别力。
+        </div>
+      </div>
+      <div class="role-card b">
+        <span class="badge">MBE</span>
+        <div class="role-title">Model Behavior Engineer</div>
+        <div class="role-count">前身叫 "Data Specialist"</div>
+        <div class="role-body">
+          背景多样——<b>Stanford 比较文学新毕业</b>、语言学博士辍学。
+          原本只是给 Simon 看 Google Sheets 里的模型输出"这条好 / 这条坏"，后来长成了独立职能。<b>Notion 正在招更多 MBE</b>。
+        </div>
+      </div>
+      <div class="role-card c">
+        <span class="badge">EVALS ENG</span>
+        <div class="role-title">Evals 工程师</div>
+        <div class="role-count">做支撑"30% 通过率"的基础设施</div>
+        <div class="role-body">
+          基线要刻意<b>故意做不过</b>，否则给 Anthropic / OpenAI 的反馈就只剩"没变差"。
+          Notion 过去 2–3 个月和两家实验室一起共建了这类"前沿 / 余量 eval"。
+        </div>
+      </div>
+    </div>
+    <p class="subtle" style="margin-top:20px;text-align:center;font-style:italic;padding:0 40px">
+      💡 "不是 eval = quality，那就像说 testing = unit test；<b>eval 本身就是一整套质量工程</b>。"
+    </p>
+  </section>
+
+  <!-- HUMAN -->
+  <section>
+    <div class="section-label">07 · 组织的一面</div>
+    <h2>当模型足够强，组织反而要更松</h2>
+    <div class="human-grid">
+      <div class="human-card">
+        <div class="icon">🎯</div>
+        <div class="h">杠杆归好奇心</div>
+        <div class="p">"AI 时代的杠杆会<b>更多地流向最好奇、最兴奋的人</b>。"Image generation 就是一个做数据库的工程师 Jimmy 周末自驱搞起来的——Gemini 额度、token 追踪、email 支持，全量资源让他跑完。</div>
+      </div>
+      <div class="human-card">
+        <div class="icon">🧱</div>
+        <div class="h">不是 quarterly hackathon，是日常</div>
+        <div class="p">创新不是一年 4 次集中冲刺。<b>每天的主业就是建设新东西</b>，不然就死了。领导者必须能放下"我说了算"的自我。</div>
+      </div>
+      <div class="human-card">
+        <div class="icon">🫙</div>
+        <div class="h">工具归工具团队</div>
+        <div class="p">Editor 团队做的 CRDT 现在解决"两个 agent 同时改同一个 block"；<b>SQL 引擎团队负责让 agent 的查询跑得快</b>——没有单独的"agent infra"团队。</div>
+      </div>
+      <div class="human-card">
+        <div class="icon">⏳</div>
+        <div class="h">慢一点，再慢一点</div>
+        <div class="p">"We ship things slowly." Custom Agents 在 alpha 阶段跑了很久：<b>一批人把它做到可上线</b>，另一批人已经在做下一代。延期一个月做 Flippy 值得。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUOTES -->
+  <section>
+    <div class="section-label">08 · 金句</div>
+    <h2>三句建议钉墙上</h2>
+    <div class="quotes">
+      <div class="quote">
+        "It's not replacing people, it's replacing processes." <br>
+        <span style="color:var(--text-faint);font-style:normal;font-size:14px;font-weight:400">—— 它不是在替换人，它是在替换流程。（Sarah 谈 Custom Agent 的真实价值）</span>
+      </div>
+      <div class="quote alt">
+        "You gradually strip away everything and it looks more AGI-like." <br>
+        <span style="color:var(--text-faint);font-style:normal;font-size:14px;font-weight:400">—— 你一层层剥掉脚手架，它就越来越像 AGI。（Simon 谈从 few-shot 到 tools-only 的演化）</span>
+      </div>
+      <div class="quote third">
+        "Over time the majority of our traffic will be coming from agents." <br>
+        <span style="color:var(--text-faint);font-style:normal;font-size:14px;font-weight:400">—— 长期来看，我们的大部分流量将来自 agent。（这是 Notion 每个产品团队的底层假设）</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAKEAWAYS -->
+  <section>
+    <div class="section-label">09 · 给不同人的启示</div>
+    <h2>你该做什么？</h2>
+    <div class="takeaways">
+      <div class="takeaway">
+        <div class="who">做 Agent 产品的</div>
+        <div class="content">
+          <ul>
+            <li><b>Eval 不是一张报表</b>，是三层工程：CI / Launch / Frontier</li>
+            <li>故意让前沿 eval <b>只过 30%</b>，否则 signal 饱和</li>
+            <li>工具海 &gt; 100 个时，上 <b>progressive disclosure</b></li>
+            <li>把"编辑 agent"和"使用 agent"<b>合并到同一个对话框</b></li>
+          </ul>
+        </div>
+      </div>
+      <div class="takeaway">
+        <div class="who">做 Infra / CTO 的</div>
+        <div class="content">
+          <ul>
+            <li>MCP 和 CLI <b>都要支持</b>，别二选一</li>
+            <li>定价和<b>能力对齐</b>——确定性工作走代码，别烧 token</li>
+            <li>不要为 agent 做"第二数据库"，<b>复用人用的引擎</b></li>
+            <li>招 <b>MBE</b>——跨学科背景比科班更关键</li>
+          </ul>
+        </div>
+      </div>
+      <div class="takeaway">
+        <div class="who">想判断行业趋势的</div>
+        <div class="content">
+          <ul>
+            <li>Labs 会继续在<b>最便宜 / 最强</b>两极拉扯，中间留给开源</li>
+            <li>"Agent 流量 &gt; 人类流量"是<b>可下注的假设</b></li>
+            <li>系统级能力（协作 / CRDT / SQL）会比模型更值钱</li>
+            <li>"<b>每一项手工流程</b>都值得问：能不能变成 agent？"</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER（无水印 / 无品牌签名,仅保留来源 + 日期） -->
+  <footer>
+    <div style="text-align:center;color:var(--text-faint);font-size:13px;line-height:1.7">
+      <div class="link" style="margin-bottom:6px"><!-- {source_url} --></div>
+      <div><!-- {publication} · {publish_date} · 整理 {ingest_date} --></div>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,68 @@
+name: Bug report
+description: BPR 跑出来的输出有问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请尽量提供 **可复现** 的输入,这样修起来快 10 倍。
+  - type: input
+    id: input-source
+    attributes:
+      label: 输入源
+      description: YouTube URL / 博客 URL / "粘贴的 transcript" / 上传的字幕文件
+      placeholder: "https://www.youtube.com/watch?v=xxx"
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: 你跑的命令
+      description: 完整的 /bpr 调用,包括所有修饰词
+      placeholder: "/bpr https://... 海报"
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望的行为
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际的行为
+      description: 错误信息 / 输出长什么样 / 截图(可拖到文本框)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: bpr 版本
+      description: 在 Claude Code 里跑 `/plugin list` 能看到
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: claude-version
+    attributes:
+      label: Claude Code 版本
+      placeholder: "claude-code 1.x.x"
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他信息
+      description: 任何你觉得有用的:其他 plugin 名单、特殊 yt-dlp 配置、自定义 hooks 等

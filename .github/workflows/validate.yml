@@ -1,0 +1,90 @@
+name: Validate plugin
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pyyaml
+        run: pip install pyyaml
+
+      - name: Validate plugin.json + marketplace.json (valid JSON)
+        run: |
+          python3 -c "
+          import json
+          for p in ['.claude-plugin/plugin.json', '.claude-plugin/marketplace.json']:
+              with open(p) as f:
+                  json.load(f)
+              print(f'✓ {p} is valid JSON')
+          "
+
+      - name: Validate version sync (plugin.json == marketplace.json plugin entry)
+        run: |
+          python3 -c "
+          import json
+          with open('.claude-plugin/plugin.json') as f:
+              pj = json.load(f)
+          with open('.claude-plugin/marketplace.json') as f:
+              mj = json.load(f)
+          plugin_v = pj['version']
+          mp_v = mj['metadata']['version']
+          mp_plugin_v = mj['plugins'][0]['version']
+          assert plugin_v == mp_v == mp_plugin_v, f'version mismatch: plugin.json={plugin_v}, marketplace.metadata={mp_v}, marketplace.plugins[0]={mp_plugin_v}'
+          print(f'✓ versions in sync: {plugin_v}')
+          "
+
+      - name: Validate SKILL.md frontmatter
+        run: |
+          python3 -c "
+          import re, yaml, sys
+          content = open('skills/bpr/SKILL.md').read()
+          m = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
+          assert m, 'SKILL.md missing YAML frontmatter'
+          fm = yaml.safe_load(m.group(1))
+          for k in ('name', 'description'):
+              assert k in fm, f'SKILL.md frontmatter missing key: {k}'
+          print(f'✓ SKILL.md frontmatter OK (name={fm[\"name\"]})')
+          "
+
+      - name: Validate referenced files exist (no dangling references)
+        run: |
+          python3 -c "
+          import re, os, sys
+          errors = []
+          # Check SKILL.md references to references/, scripts/, templates/
+          content = open('skills/bpr/SKILL.md').read()
+          # Find paths like references/foo.md, scripts/bar.sh, templates/x.html
+          referenced = re.findall(r'(?:references|scripts|templates)/[\w\-/.]+\.(?:md|sh|py|html)', content)
+          referenced = sorted(set(referenced))
+          base = 'skills/bpr/'
+          for path in referenced:
+              full = os.path.join(base, path)
+              if not os.path.exists(full):
+                  errors.append(f'  - SKILL.md references missing: {path}')
+          if errors:
+              print('✗ Dangling references in SKILL.md:')
+              for e in errors:
+                  print(e)
+              sys.exit(1)
+          print(f'✓ All {len(referenced)} referenced files exist in skills/bpr/')
+          "
+
+      - name: Check no hardcoded user paths leaked
+        run: |
+          if grep -rn '/Users/\|/home/' skills/ README.md CHANGELOG.md CONTRIBUTING.md 2>/dev/null; then
+            echo '✗ Found hardcoded user paths above — please relativize'
+            exit 1
+          fi
+          echo '✓ No hardcoded user paths'
