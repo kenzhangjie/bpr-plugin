@@ -72,7 +72,12 @@
 - [ ] 阅读列宽 ≤ 800px(中英文混排最佳宽度)
 - [ ] print stylesheet 有效(Cmd+P 预览)
 - [ ] 没有编造的 URL / 头像 / LinkedIn
-- [ ] **文件名日期 = 内容发布日期**,不是处理日期(YouTube → metadata.json `upload_date`;博客 → 文章页 `<time>`;拿不到 → 问用户)
+- [ ] **文件名日期 = 内容发布日期**,不是处理日期。提取顺序(参 `rules.md` "发布日期提取"):
+  - YouTube → `metadata.json` 的 `upload_date`(`scripts/fetch_youtube.sh` 已自动跑)
+  - 博客 / essay → 跑 `python3 scripts/extract_metadata.py <URL>`(7 种策略,JSON-LD / OG / wp-uploads / body-text 等)
+  - Podcast 非 YouTube → WebSearch 找 Spotify / Apple Podcasts / Substack / libsyn 页
+  - 拿不到 → 问用户,**绝不静默用今天**;**禁止 WebFetch 兜底**(L4)
+- [ ] Hero kicker 里的日期 = 文件名日期,两处一致
 - [ ] 文件名遵守四种 pattern(参 SKILL.md "输出 / 文件名"):
   - 单一主持 podcast → `{date}_{podcast}_{guest}_{topic}.html`(host 隐含在 podcast slug)
   - 多主持 podcast → `{date}_{podcast}_{host}-x-{guest}_{topic}.html`
@@ -81,4 +86,4 @@
 - [ ] 主要分隔符是 `_`,词内 / 多词组合用 `-`(`anton-osika_lovable-200m-arr` 而不是 `anton-osika-lovable-200m-arr`)
 - [ ] 全小写,无空格 / 中文 / 大写
 - [ ] 总长度 ≤ 80 字符,目标 50-70
-- [ ] 输出到 `<output_dir>`(默认 `~/Documents/Transcript/`)
+- [ ] 输出到 `/Users/ken/Documents/Transcript/`

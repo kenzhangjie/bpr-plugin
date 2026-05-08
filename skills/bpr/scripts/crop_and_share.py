@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Auto-crop the bottom whitespace of a Chrome-rendered poster PNG and emit
-both a hidpi version and a downsampled share version.
+"""Auto-crop the bottom whitespace of a Chrome-rendered poster PNG.
 
 Usage:
-  python3 crop_and_share.py <raw.png> <hidpi.png> <share.png>
+  python3 crop_and_share.py <raw.png> <hidpi.png>
 
 The raw PNG is assumed to be 2x retina (e.g. 2160 wide for a 1080-logical
 layout). Brightness threshold 120 finds the last row with content.
+Outputs only the hidpi version (cropped, no resize). Raw is deleted after.
 """
 import os
 import sys
@@ -28,11 +28,11 @@ def find_content_bottom(im: Image.Image, threshold: int = 120, sample_step: int 
 
 
 def main() -> int:
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 3:
         print(__doc__)
         return 2
 
-    raw_path, hidpi_path, share_path = (Path(p) for p in sys.argv[1:])
+    raw_path, hidpi_path = (Path(p) for p in sys.argv[1:])
     im = Image.open(raw_path).convert("RGB")
     w, h = im.size
     print(f"raw: {w}x{h}")
@@ -43,10 +43,6 @@ def main() -> int:
     cropped = im.crop((0, 0, w, bottom))
     cropped.save(hidpi_path, optimize=True)
     print(f"hidpi: {cropped.size} -> {hidpi_path} ({os.path.getsize(hidpi_path):,} bytes)")
-
-    share = cropped.resize((w // 2, bottom // 2), Image.LANCZOS)
-    share.save(share_path, optimize=True)
-    print(f"share: {share.size} -> {share_path} ({os.path.getsize(share_path):,} bytes)")
 
     if raw_path.exists() and raw_path != hidpi_path:
         raw_path.unlink()

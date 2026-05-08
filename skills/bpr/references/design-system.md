@@ -1,7 +1,7 @@
 # BPR · Design System(why,not what)
 
 > CSS / DOM 完整代码 → `templates/base.html`,直接 copy。
-> 本文件解释**设计决定背后的原因**,LLM 不需要,但 maintainer 需要。
+> 本文件解释**设计决定背后的原因**,LLM 不需要,但你(Ken)和未来的 maintainer 需要。
 
 ## 美学锚点
 

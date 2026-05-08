@@ -1,7 +1,7 @@
 # 翻译三步法 · Translate → Reflect → Improve
 
 > 📌 **本文件是 BPR 内部副本,服务于 /bpr 流水线**。
-> 如果你**不在** /bpr 流程中,而是想单独翻译一段英文 → 可使用独立的 `translate` skill(若已安装,触发词:翻译这段 / 帮我翻 / translate this 等)。
+> 如果你**不在** /bpr 流程中,而是想单独翻译一段英文 → 用独立的 [`translate` skill](/Users/ken/.claude/skills/translate/SKILL.md)(自动触发,触发词:翻译这段 / 帮我翻 / translate this 等)。
 > 两边方法论保持同步。改一边请同步另一边。
 
 ## 为什么用三步法

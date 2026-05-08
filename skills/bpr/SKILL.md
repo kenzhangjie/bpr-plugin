@@ -5,12 +5,9 @@ description: 把英文 podcast transcript / 字幕 / 访谈文本 / 博客 essay
 
 # BPR · Bilingual Podcast / Essay Reader
 
-> **占位符约定**:
-> - `<SKILL_DIR>` = 本 skill 安装目录(模型从已 Read 的 SKILL.md 文件路径推算,通常形如 `~/.claude/plugins/.../skills/bpr/`)
-> - `<output_dir>` = 输出文件落盘目录,默认 `~/Documents/Transcript/`,首次使用时询问用户偏好
-
 ## 触发条件
-- 用户输入 `/bpr <内容>` 或 `/bpr` 后跟 transcript / 博客 URL / 长文文本
+- 用户输入 `/bpr <内容>` 或 `/bpr` 后跟 transcript / 博客 URL / 长文文本 → 只出 HTML
+- 用户输入 `/bpr all <内容>` → 出 HTML **+** 海报 hidpi PNG
 - 用户上传字幕文件并要求"做成双语阅读器"
 - 用户明确说"按 BPR 规则"
 
@@ -18,7 +15,7 @@ description: 把英文 podcast transcript / 字幕 / 访谈文本 / 博客 essay
 
 | # | 步骤 | 加载哪些 reference |
 |---|---|---|
-| 0 | URL 输入预处理(YouTube → yt-dlp 拉字幕;blog → WebFetch) | `references/rules.md` "URL 输入处理" |
+| 0 | URL 输入预处理 + **提取发布日期**(YouTube → `scripts/fetch_youtube.sh`;blog → `scripts/extract_metadata.py`,curl 抓页面跑 7 种策略) | `references/rules.md` "URL 输入处理" + "发布日期提取" |
 | 1 | 识别输入类型(SRT / 带时间戳 transcript / 纯文本 transcript / blog essay) | — |
 | 2 | 预处理(合并跨条句、提取说话人、标注时间戳;auto-subs 需要重断句+加标点) | — |
 | 3 | 章节切分(按下方"自适应"表) | — |
@@ -26,10 +23,13 @@ description: 把英文 podcast transcript / 字幕 / 访谈文本 / 博客 essay
 | 5 | **逐句翻译**(三步法,每章每段都跑,不跳过) | **`references/translation-prompt.md`** 必读 |
 | 6 | 生成 HTML | **`templates/base.html`** copy 骨架 + `references/rules.md` 看双语对照 / inline link 规范 |
 | 7 | 质量自检 | `references/checklist.md` |
-| 8 | **(可选)海报阶段**:仅当 `海报`/`分享版`/`poster` 修饰词出现时跑 | **`references/poster-rules.md`** + `references/poster-template.html` + `scripts/crop_and_share.py` |
+| 8 | **(可选)海报阶段**:仅当命令以 `/bpr all` 开头时跑 | **`references/poster-rules.md`** + `templates/poster-template.html` + `scripts/crop_and_share.py` |
+| 9 | **重建 landing index**(每次都跑):扫 Transcript 目录所有 `*.html` → 重新生成 `index.html` | `scripts/build_index.py` |
+| 10 | **部署到 bpr.ken.solar**(每次都跑):`cd ~/Documents/Transcript && vercel --prod --yes` | — |
 
 > **加载策略**:不要在第 1 步就读完所有 reference。只在到达对应步骤时再读对应文件,节省 context。
 > **YouTube URL 输入**:走 step 0 调用 `scripts/fetch_youtube.sh`,**不要**假装能直接 WebFetch 到 transcript。
+> **Step 9 + 10 注意**:macOS 文件系统大小写不敏感但**保留**——见 `lessons-learned.md` L5。如果 Transcript 目录里有遗留的 `INDEX.html`(大写),build_index.py 会"覆盖"内容但保留大写文件名,Vercel 不会把它当 root,bpr.ken.solar 会 404。修法:`rm INDEX.html` 再跑 build_index。
 
 ## 自适应规模
 
@@ -96,17 +96,19 @@ description: 把英文 podcast transcript / 字幕 / 访谈文本 / 博客 essay
 - `正式` → 去口语化
 - `速读` → 折叠双语,默认只显中文
 - `学习` → 双语并排两列
-- `带批注` → 在 callout 中加入 `[Reader note]`
-- **`海报` / `分享版` / `poster`** → 在双语 HTML 之外**额外**生成一张可分享的长图 PNG(深色,1080 宽,无水印)
+- `带批注` → 在 callout 中加入 `[Ken note]`
+
+> 注:**海报输出不再用修饰词触发**。改为子命令前缀:`/bpr all <内容>` 即同时出 HTML + 海报 hidpi PNG。详见下方"海报模式"。
 
 ## 海报模式 / Share Poster
 
-当用户在 `/bpr` 命令里附带 `海报` / `分享版` / `poster` 修饰词,**先按常规流程出双语 HTML**,然后**再加一步**生成长图 PNG。
+当用户命令以 **`/bpr all`** 开头,**先按常规流程出双语 HTML**,然后**再加一步**生成 hidpi 长图 PNG。
 
 ### 触发判定
-- 修饰词出现 → 海报阶段必跑
-- 没出现但用户事后说"做成图"/"出张海报" → 用已生成的 BPR HTML 内容,跑海报阶段
+- 命令首 token 是 `all`(`/bpr all <URL>` / `/bpr all <transcript>`)→ 海报阶段必跑
+- 命令没有 `all` 但用户事后说"做成图"/"出张海报" → 用已生成的 BPR HTML 内容,跑海报阶段
 - 用户说"只要图,不要 HTML" → 仍按完整 BPR 流程提炼内容,只是跳过 HTML 落盘
+- **不再支持** `海报` / `分享版` / `poster` 这类后置修饰词触发(已废弃)
 
 ### 硬要求(运行前先验证)
 
@@ -114,18 +116,19 @@ description: 把英文 podcast transcript / 字幕 / 访谈文本 / 博客 essay
 |---|---|
 | `python3 -c "from PIL import Image"` | macOS 默认有 Pillow,没装就 `pip3 install Pillow` |
 | Headless Chrome | `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` 存在 |
-| 模板文件 | `references/poster-template.html`(本 skill 自带) |
+| 模板文件 | `templates/poster-template.html`(本 skill 自带) |
 | crop 脚本 | `scripts/crop_and_share.py`(本 skill 自带) |
 
 ### 工作流(详见 `references/poster-rules.md`)
 
 1. **复用 BPR 已提炼的内容**:hero / TL;DR(取 3-6 条最强)/ 章节关键金句 / 引用 → 不要重新读原文
 2. **挑 5-9 个海报 section** —— 不用每节都填,根据内容性质选,但 hero/stats/quotes/takeaways 几乎必出
-3. **复制模板**:`cp references/poster-template.html <output_dir>/<slug>-poster.html`
+3. **复制模板到临时位置**:`cp templates/poster-template.html /tmp/<slug>-poster.html`(中间产物,不要落到 Transcript 目录)
 4. **填入内容**:用 Edit 工具改 hero / 各 section 文案 / 章节金句
-5. **Chrome 渲染**:headless,2x retina,1080x8000 画布,输出 raw PNG
-6. **裁剪 + 降采样**:`scripts/crop_and_share.py raw.png hidpi.png share.png`
-7. **报告 3 个产物**:HTML reader / hidpi 海报 / 分享版海报
+5. **Chrome 渲染**:headless,2x retina,1080×12000 画布,输出 raw PNG 到临时位置
+6. **裁剪**:`scripts/crop_and_share.py raw.png /Users/ken/Documents/Transcript/<stem>-poster.png`(直接输出最终命名,无 `-hidpi` 后缀)
+7. **清理中间产物**:删除 `/tmp` 下的 poster HTML 和 raw PNG(crop 脚本已自动删 raw)
+8. **报告 2 个产物**:`<stem>.html`(双语 HTML reader)+ `<stem>-poster.png`(海报)。**不保留 poster HTML**——它是一次性中间产物。
 
 ### ⚠️ 无水印硬规则
 
@@ -138,16 +141,18 @@ description: 把英文 podcast transcript / 字幕 / 访谈文本 / 博客 essay
 
 ### 输出文件名
 
-海报阶段沿用 BPR 文件名 stem,加后缀:
+海报阶段最终**只产出 2 个文件**:
 
 | 产物 | 文件 |
 |---|---|
-| 双语 HTML | `<stem>.html`(原 BPR 输出) |
-| 海报源 HTML | `<stem>-poster.html` |
-| 海报 hidpi | `<stem>-poster-hidpi.png`(2160 宽,2x retina) |
-| 海报分享版 | `<stem>-poster-share.png`(1080 宽,~2MB) |
+| 双语 HTML(主输出)| `<stem>.html` |
+| 海报(归档 + 分享)| `<stem>-poster.png`(2160 宽,2x retina) |
 
-四个文件都落到 `<output_dir>`(默认 `~/Documents/Transcript/`)。
+两个文件都落到 `/Users/ken/Documents/Transcript/`。
+
+**中间产物**(`<stem>-poster.html` 和 `<stem>-poster-raw.png`)放在 `/tmp/`,跑完不要拷到 Transcript 目录。crop 脚本会自动删 raw PNG;poster HTML 由调用流程在 step 7 删除。
+
+需要分享小图(1080 宽)就 `sips -Z 1080 <stem>-poster.png --out <stem>-poster-share.png`(降采样可选,放大不可逆)。
 
 ## 输出
 
@@ -157,10 +162,9 @@ description: 把英文 podcast transcript / 字幕 / 访谈文本 / 博客 essay
 - 用 `_` 分隔主要部分(date / source / person / topic)
 - 用 `-` 在词内部和多词组合(`anton-osika` / `lovable-200m-arr`)
 - 全小写,无空格 / 中文 / 大写
-- **日期 = 内容发布日期**,不是处理日期
-  - YouTube → metadata.json 的 `upload_date`(YYYYMMDD → YYYY-MM-DD)
-  - 博客 → 文章页 `<time>` / meta 标签 / 顶端日期
-  - 都拿不到 → 明确问用户,**不要静默用今天**
+- **日期 = 内容发布日期**,不是处理日期 → **直接跑 `python3 scripts/extract_metadata.py <URL>`**,完整规则见 `references/rules.md` "发布日期提取"
+  - 提取优先级:`extract_metadata.py`(博客)/ `fetch_youtube.sh` metadata.json(YouTube)→ Episode 平台页 → WebSearch → 问用户
+  - **拿不到时必须问用户,绝不静默用今天**
 
 **四种 pattern**:
 
@@ -184,9 +188,28 @@ description: 把英文 podcast transcript / 字幕 / 访谈文本 / 博客 essay
 
 **总长度目标 50-70 字符**(Finder 列表视图舒适宽度),> 80 字符 → 缩 topic。
 
+### 真值表(URL → 文件名)
+
+跑 `extract_metadata.py` 拿到 `date` + `source_slug`,再加上从内容里抓的 `guest`/`author`/`topic`,组装成下面这种:
+
+| 输入 URL | 输出文件名 |
+|---|---|
+| `https://www.lennysnewsletter.com/p/building-lovable-anton-osika` | `2025-03-09_lennys-podcast_anton-osika_lovable-10m-arr-60-days.html` |
+| `https://andrewchen.com/the-adjacent-user-theory/` | `2020-07-01_andrew-chen_adjacent-user-theory.html` |
+| `https://paulgraham.com/writes.html` | `2024-10-01_paul-graham_writes-and-write-nots.html` |
+| `https://www.youtube.com/watch?v=SlGRN8jh2RI`(Sequoia AI Ascent · Boris Cherny)| `2026-04-XX_sequoia_boris-cherny_coding-is-solved.html` |
+| `https://www.anthropic.com/news/writing-effective-tools` | `2025-04-29_anthropic-blog_dianne-penn_writing-effective-tools.html` |
+| `https://nav.al/specific-knowledge` | `2018-XX-XX_naval_specific-knowledge.html` |
+
+**几个隐含规则**:
+- `lennys-podcast` 已含 host(Lenny Rachitsky)→ 文件名只写 guest(`anton-osika`)
+- `paul-graham` / `naval` / `andrew-chen` 单作者站 → 不重复写作者,直接 `{date}_{source-slug}_{topic}`
+- `sequoia` / `y-combinator` 多主持节目 → 文件名要带 host × guest(若适用)或单 guest
+- `anthropic-blog` / 其他 publication blog → `{date}_{publication}_{author}_{topic}`
+
 ### 输出路径
 
-`<output_dir>`(默认 `~/Documents/Transcript/`,首次使用询问用户)
+`/Users/ken/Documents/Transcript/`
 
 ## 错误处理
 

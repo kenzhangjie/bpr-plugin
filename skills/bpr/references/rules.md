@@ -29,11 +29,55 @@
 
 | URL 类型 | 处理 |
 |---|---|
-| 普通博客 / essay(Anthropic Blog / nav.al / paulgraham.com / 公开 Substack / Medium / Stratechery 公开期等)| WebFetch 抓 → 走正常流程 |
+| 普通博客 / essay(Anthropic Blog / nav.al / paulgraham.com / 公开 Substack / Medium / Stratechery 公开期等)| **curl 抓**(verbatim 原文,**不要用 WebFetch**——它会把长文压缩成摘要)→ 走正常流程 |
 | **YouTube** | 走"YouTube 一站式流程"(下面) |
 | Apple Podcasts / Spotify / Overcast | 不能直接抓,先问用户能不能给 YouTube URL(同期一般两边都有) |
-| Paywall / 登录墙(WSJ / NYT / 付费 Substack)| WebFetch 失败时**直接告诉用户**抓不到,让 ta 粘 raw text |
+| Paywall / 登录墙(WSJ / NYT / 付费 Substack)| curl 失败时**直接告诉用户**抓不到,让 ta 粘 raw text |
 | PDF 链接 | 让用户先下载到本地,再 `/bpr <文件路径>` |
+
+### 抓取命令(博客 / essay)
+
+```bash
+curl -s -L \
+  -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+  "<URL>" -o /tmp/bpr-raw.html
+```
+
+抓完用 Python regex 或 sed 提取 `<article>` / 主正文 div(每个站点不一样,看着 HTML 结构来),然后转成纯文本喂给 BPR 流程。**curl 拿到的是 verbatim HTML,不是 WebFetch 那种摘要**——这是 BPR 翻译质量的硬要求。
+
+> ⚠️ **L4 硬规则**:抓博客 / 长文,一律 curl;`WebFetch` 只用于"我想知道这页面大致讲什么"的摘要场景。详见 `lessons-learned.md` L4。
+
+## 发布日期提取(文件名用)
+
+文件名第一段是发布日期。**绝对不能用今天的日期填占位**,要从内容来源拿真实日期。
+
+### 提取策略(按优先级)
+
+| 优先级 | 来源 | 说明 |
+|---|---|---|
+| 1 | **`scripts/extract_metadata.py <URL>`**(博客 / essay)| 自动跑 7 种策略:JSON-LD → OG meta → 通用 meta → HTML5 `<time>` → URL `/YYYY/MM/DD/` → WordPress `wp-uploads/YYYY/MM/` → 正文开头 "Month YYYY" |
+| 2 | **`scripts/fetch_youtube.sh` 产出的 metadata.json**(YouTube)| 字段 `upload_date`(YYYYMMDD)→ 转 `YYYY-MM-DD` |
+| 3 | **Episode 平台页**(Spotify / Apple / Substack)| 1 + 2 都没拿到 → 看用户能不能给 episode 页面 URL,再走 1 |
+| 4 | **WebSearch**(罕见)| 用作者名 + 标题搜,看官方 podcast feed / Wayback / Goodreads / 媒体报道里的发布时间 |
+| 5 | **问用户** | 前 4 步全空才走这一步,**绝不静默用今天** |
+
+### 用法
+
+```bash
+python3 ~/.claude/skills/bpr-skill/scripts/extract_metadata.py "<URL>"
+```
+
+输出 JSON,关心的字段:
+- `date` — ISO `YYYY-MM-DD`(可能为 null)
+- `source_slug` — 文件名第二段(`paul-graham` / `lennys-podcast` / ...)
+- `title` / `author` / `publication` — 给 hero 用
+- `source` — 调试字段,告诉你是哪条策略命中的(`jsonld:datePublished` / `wp-uploads` / `body:month-year` 等)
+
+### 已知限制
+
+- **SPA / JS-rendered 站点**(anthropic.com 当前版本)— curl 拿到的是 shell,extract_metadata.py 会返回 `date: null`。这种情况退化到优先级 4(WebSearch)或 5(问用户)
+- **WordPress wp-uploads 检测要求 ≥3 个 upload 路径**才采用,降低误判
+- **Body text "Month YYYY" 只看正文前 1500 字符**,paulgraham 这种顶部纯文本日期会命中;复杂 layout 的现代博客通常用不上(因为 1-3 步已经命中)
 
 ### YouTube 一站式流程
 
@@ -103,6 +147,87 @@ cat "$WORKDIR/metadata.json"
 - 抓回来内容只有 `<title>` + 几行 description → 抓失败,提示用户粘 raw text
 - 字数 < 500 → 多半是简介页或被截断,同样提示
 - 抓到完整正文 → 走正常流程
+
+---
+
+## 发布日期提取(必跑,不能跳)
+
+**前置**:文件名日期必须是**内容发布日期**,不是处理日期。**绝不静默用今天**。
+
+按下表的优先级**逐级试**,前一级拿到就停,跳到 Step Z 应用日期。
+
+### Step P1 · YouTube → yt-dlp metadata(最准)
+
+`fetch_youtube.sh` 已经把 `upload_date` 存到 `$WORKDIR/metadata.json`,直接读:
+```bash
+cat "$WORKDIR/metadata.json" | python3 -c "import json,sys;d=json.load(sys.stdin);u=d['upload_date'];print(f'{u[:4]}-{u[4:6]}-{u[6:8]}')"
+```
+→ 输出 `YYYY-MM-DD`,直接用。**这是最可靠的来源**(YouTube 自己记录的,不是页面解析)。
+
+### Step P2 · 博客 / Essay → 先跑脚本,失败再 WebFetch
+
+#### P2a · 跑脚本(优先,~70% 场景秒级解决)
+
+```bash
+python3 ~/.claude/skills/bpr-skill/scripts/extract_publish_date.py "<URL>"
+```
+
+返回:
+- `YYYY-MM-DD`(exit 0)→ 直接用,跳到 Step Z
+- `not_found`(exit 1)→ 脚本兜不住,继续 P2b
+
+脚本检查的来源(按优先级):
+1. `<meta property="article:published_time">`
+2. `<meta name="date">` / `<meta name="dc.date">`
+3. JSON-LD `<script type="application/ld+json">` 里的 `datePublished`
+4. `<time datetime="YYYY-MM-DD">`
+5. `<meta property="og:updated_time">`(末位,updated 不如 published 准)
+
+**已验证好用的站**:nav.al / Lenny's Substack / 大部分 WordPress / 新闻站 / Medium。
+**脚本搞不定的站**(JS-rendered SPA):claude.com/blog / 部分 Vercel 部署的 Next.js 站 / 很多现代静态生成博客。这些走 P2b。
+
+#### P2b · 脚本失败 → WebFetch + 显式 prompt
+
+WebFetch 时**显式 prompt 抓发布日期**(不是只抓正文):
+
+> "Extract the publish date of this article. Look for `<time>` tags, `<meta property='article:published_time'>`, JSON-LD `datePublished`, og:updated_time, or visible date in the byline. Reply with just the date in YYYY-MM-DD format, or `not found`."
+
+LLM 模型可能能推断出 JS-rendered 页面的内容(它看到的是 markdown 化版本,有时包含元数据)。失败再继续 P3。
+
+### Step P3 · Podcast(非 YouTube)→ 平台页 + WebSearch
+
+Podcast episode 通常 YouTube 之外还有 Spotify / Apple Podcasts / Substack(Lenny's)/ libsyn(20VC),WebSearch 找到 episode 页:
+- Spotify episode URL → 页面有 release date
+- Apple Podcasts URL → 页面有发布日期
+- Substack post(Lenny / Stratechery)→ URL 通常含日期或页面有
+- Twitter/X 主持人发布通告 post → status ID 编码时间
+
+WebSearch query 模板:
+```
+"<podcast name>" "<guest name>" "<topic keyword>" episode date
+```
+要求模型从结果中**只挑有具体日期的来源**(Spotify / Apple Podcasts / Substack / 官方 newsletter),不要相信博客文章的"发布于 X 周前"这种相对描述。
+
+### Step P4 · Transcript 内部线索(辅助)
+
+读 transcript 头几段或尾几段,有时主持人会说:
+- "Recording this on April 23"
+- "Last week the Anthropic team launched X..."(可推断录制时间)
+这是**次要参考**,只在前 3 步都失败时用。
+
+### Step P5 · 实在拿不到 → 明确问用户
+
+```
+"我没法可靠拿到这期的发布日期。你知道吗?或者给我一个 Spotify/Apple Podcasts/YouTube URL 我去抓?"
+```
+
+**绝不静默用今天**。文件名日期错位会让时间线乱掉,后续整理代价更大。
+
+### Step Z · 应用日期到文件名 + Hero kicker
+
+拿到 `YYYY-MM-DD` 后:
+- **文件名前缀** = 这个日期
+- **Hero kicker** 也用这个日期(`{Podcast} with {Host} · YYYY-MM-DD · 双语整理`),不要用今天
 
 ### 不要做的事
 

@@ -157,3 +157,106 @@ For more information, pass 'verbose: true' in the second argument to fetch()
 #### 自检
 
 写完后跑 `wc -c <file>`,确认大小符合预期(70-110KB 是 12-13 章长 podcast 的正常区间)。
+
+---
+
+## L4 · WebFetch 把博客原文摘要化 (2026-05-07)
+
+### 症状
+
+跑 `/bpr https://andrewchen.com/the-adjacent-user-theory/` 时,
+WebFetch 返回的"原文"长度约 2000 词,带着 `## Overview` / `## Core Concept`
+这种结构化小标题,看起来像散文摘要。
+
+按这份"原文"做出的双语 HTML 句对句对照——句子全是模型重写过的英文,
+不是 Bangaly Kaba 的原话。用户反馈:**结果很一般**。
+
+### 根因
+
+`WebFetch` 工具内部有一个"小快模型",会把长 HTML 压缩成结构化摘要返回,
+即使 prompt 里写了 "verbatim",它仍然压。这是工具行为,不是 prompt 能改的。
+
+事后用 curl 重新抓同一个 URL,得到 6,302 词原文(比 WebFetch 多 3 倍),
+且每段都是 Bangaly 的连续散文,没有 `## Overview` 这种小标题——后者是
+WebFetch 自己加的结构化包装。
+
+### 硬规则
+
+1. **抓博客 / 长文 / podcast 文章页 → 一律 curl**:
+
+   ```bash
+   curl -s -L \
+     -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ..." \
+     "<URL>" -o /tmp/bpr-raw.html
+   ```
+
+   然后用 Python regex / sed 提取 `<article>` 或主正文 div。
+
+2. **WebFetch 只保留给"我想知道这页面大致讲什么"的摘要场景** —— 比如
+   要确认这个 URL 是不是用户想要的内容、看一下作者是谁。**绝不用于 BPR 主流程的正文输入**。
+
+3. **抓完后做 sanity check**:
+   - 字数与预期相符(博客 essay 一般 1.5K-8K 词,长 podcast 文章页 5-15K)
+   - 没有出现 `## Overview` / `**Compounds Over Time**:` 这种 WebFetch 风格的小标题
+   - 段落是连续散文,不是 bullet point 拼接
+   - **不符合 → curl 重抓,而不是将就用**
+
+4. **GitHub URL 例外**:用 `gh` CLI(`gh pr view`/`gh issue view`),不走 curl 也不走 WebFetch。
+
+5. **登录墙 / paywall**:curl 拿到的是登录页 → 直接告诉用户抓不到,让 ta 粘 raw text,**不要去试 WebFetch 兜底**(WebFetch 可能拿到带摘要的预览页,质量更糟)。
+
+### 关联工具
+
+- **`scripts/extract_metadata.py`** — 抓 URL 的发布日期 + 标题 + 作者,内部已经走 curl,直接调即可
+- **`scripts/fetch_youtube.sh`** — YouTube 走 yt-dlp,跟 curl 是平行路径,各管一摊
+
+---
+
+## L5 · macOS 大小写不敏感 FS + Vercel 大小写敏感路由 (2026-05-08)
+
+### 症状
+
+`build_index.py` 跑完,本地 `ls` 看 `index.html` 存在(15KB)。
+`vercel --prod` 部署成功,但 `https://bpr.ken.solar/` 一直返回 **HTTP 404**,
+单篇 transcript 文件却 HTTP 200。
+
+### 根因
+
+Transcript 目录里**有遗留的 `INDEX.html`(大写)**——之前 stale 那个还没清掉。
+macOS 默认 APFS 文件系统**大小写不敏感但保留(case-insensitive but case-preserving)**:
+
+- Python `open("index.html", "w")` 在 case-insensitive FS 上**匹配到**已有的 `INDEX.html`
+- 写入操作**只更新内容,不会重命名文件**——磁盘上仍然是 `INDEX.html`
+- Vercel 路由是**大小写敏感的**——只把小写 `index.html` 当 root
+
+结果:文件确实部署上去了,但 Vercel 把它当成普通文件 `INDEX.html`,
+访问 `/INDEX.html` 才能命中,访问 `/` 没有 root,404。
+
+### 硬规则
+
+1. **build_index.py 跑之前**先清掉任何遗留的大写 `INDEX.html`:
+   ```bash
+   [ -f /Users/ken/Documents/Transcript/INDEX.html ] && \
+     rm /Users/ken/Documents/Transcript/INDEX.html
+   ```
+
+2. **写文件用"先删后写"模式**,而不是直接 `write_text`:
+   ```python
+   if INDEX_PATH.exists():
+       INDEX_PATH.unlink()
+   INDEX_PATH.write_text(html)
+   ```
+   保证磁盘文件名是小写。
+
+3. **部署后必须 curl 测 root**:
+   ```bash
+   curl -s -o /dev/null -w "HTTP %{http_code}\n" https://bpr.ken.solar/
+   ```
+   不是 200 → 立刻去看磁盘文件名(`ls *.html | grep -i index`)。
+
+4. **更通用的教训**:**Vercel / Cloudflare / 任何 web 服务器都是大小写敏感的**——
+   静态资源文件名(尤其 index.html / favicon.ico / robots.txt)必须严格小写。
+
+### 关联
+
+- L1-L3 都是"产物正确但显示错"——L5 加进来:产物**和**文件名都正确,但**因为 FS 大小写差异导致路由不匹配**

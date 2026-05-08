@@ -1,6 +1,6 @@
 # 海报模式规则 / Poster Rules
 
-> /bpr 海报阶段专用。先按主流程出双语 HTML,再读这个文件做海报。
+> /bpr 海报阶段专用。**触发**:命令以 `/bpr all` 开头(`/bpr all <URL>` 或 `/bpr all <transcript>`)。先按主流程出双语 HTML,再读这个文件做海报。
 
 ---
 
@@ -92,54 +92,87 @@
 
 ## 渲染流程(标准命令)
 
-### 1. 复制模板
+> **重要约定**:海报源 HTML 和 raw PNG 都是**临时中间产物**,放 `/tmp/`,**不要**落到 Transcript 目录。
+> 最终 Transcript 目录只有 `<stem>.html` + `<stem>-poster.png` 两个文件。
+
+### 1. 复制模板到 /tmp
 
 ```bash
-cp <SKILL_DIR>/references/poster-template.html \
-   "<output_dir>/<stem>-poster.html"
+cp /Users/ken/.claude/skills/bpr-skill/templates/poster-template.html \
+   "/tmp/<stem>-poster.html"
 ```
 
-> 占位符:`<SKILL_DIR>` = 本 skill 安装目录(从 SKILL.md 路径推算);`<output_dir>` = 默认 `~/Documents/Transcript/`
-
-### 2. 用 Edit 工具改三件事
+### 2. 用 Edit 工具改三件事(对象是 /tmp 下的副本)
 - `<title>` 和 hero h1 / .title-cn
 - 各 section 的文案 / 卡片
 - footer 的 source URL + 日期
 
 **不要触碰**:CSS / 整体 layout / section class 名
 
-### 3. Chrome headless 渲染
+### 3. Chrome headless 渲染(到 /tmp)
 
 ```bash
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   --headless=new --hide-scrollbars --disable-gpu \
   --force-device-scale-factor=2 \
-  --window-size=1080,8000 \
-  --screenshot="<output_dir>/<stem>-poster-raw.png" \
-  "file://<output_dir>/<stem>-poster.html"
+  --window-size=1080,12000 \
+  --screenshot="/tmp/<stem>-poster-raw.png" \
+  "file:///tmp/<stem>-poster.html"
 ```
 
 ⚠️ 路径有空格的话用引号包,`file://` 必须是绝对路径。
 
-### 4. Crop + 降采样
+### 4. Crop 到 Transcript 目录(直接最终命名,无 -hidpi 后缀)
 
 ```bash
-python3 <SKILL_DIR>/scripts/crop_and_share.py \
-  <output_dir>/<stem>-poster-raw.png \
-  <output_dir>/<stem>-poster-hidpi.png \
-  <output_dir>/<stem>-poster-share.png
+/usr/bin/python3 /Users/ken/.claude/skills/bpr-skill/scripts/crop_and_share.py \
+  /tmp/<stem>-poster-raw.png \
+  /Users/ken/Documents/Transcript/<stem>-poster.png
 ```
+
+> 注:用 `/usr/bin/python3` 而不是 `python3`,因为 brew 的 python3 可能是损坏版本(已踩坑)。系统 3.9 自带 Pillow 走得通。
 
 脚本会:
 1. 找最后一行 brightness>120 的像素位置
 2. 加 80px padding 后裁掉下方空白
-3. 输出 hidpi 版(2x retina,2160 宽)
-4. 输出分享版(downsample 到 1080 宽)
-5. 删除 raw 中间文件
+3. 输出 2x retina(2160 宽)hidpi PNG 到 Transcript 目录
+4. 删除 raw 中间文件(/tmp/<stem>-poster-raw.png)
 
-### 5. Verify
-- Read 一下 share PNG 检查视觉
-- 确认无水印、无溢出、无残留模板内容
+### 5. 清理中间 poster HTML
+
+```bash
+rm /tmp/<stem>-poster.html
+```
+
+(crop 脚本只删 raw PNG,不会动 HTML——必须手动删。)
+
+> 需要分享小图(1080 宽)自己 `sips -Z 1080 <stem>-poster.png --out <stem>-poster-share.png`。降采样可选,放大不可逆。
+
+### 5. Verify(强制清单,渲染完每一项都要确认)
+
+#### 自动化检查(grep)
+```bash
+# 不应该有任何残留水印 / 模板占位文本
+grep -iE 'watermark|harry同学|整理 ·|©|<!-- *\{' "<stem>-poster.html" && echo "❌ 残留" || echo "✅ 无残留"
+```
+
+#### 视觉自查(用 Read 工具看 PNG)
+- [ ] **没有水印泄漏** —— 没有对角重复文字、没有 "整理 · X"、没有 "© 2026 X"
+- [ ] **没有模板占位** —— 没有 `<!-- {kicker} -->` / `<!-- {publication} -->` 这种没替换掉的注释
+- [ ] **section 没有溢出** —— 卡片文字没被截断、表格列没溢出 1080 宽
+- [ ] **底部没有大块空白** —— crop 脚本应该已经处理,但要看一眼
+- [ ] **顶部没有空白** —— 偶尔会有 hero 上方一片空,通常是 mobile-only 元素泄漏到桌面
+- [ ] **中文字体加载** —— 中文不是方框 / 不是 fallback 衬线乱码
+- [ ] **Hero 标题没换错行** —— 长标题要能在合适位置断行,不要孤悬一个字
+- [ ] **数字 / quote / takeaway 这三个核心 section 都在**(海报识别度的关键)
+- [ ] **footer 只有 source URL + 日期**,无品牌签名
+
+#### 文件健康
+- [ ] PNG 在 3-8 MB 之间(过大 = 没 optimize,过小 = 内容稀疏 / crop 切多了)
+- [ ] 宽度 = 2160(`identify` / `sips -g pixelWidth`)
+- [ ] 文件名 = `<stem>-poster.png`(无 `-hidpi` 后缀)
+- [ ] Transcript 目录下**不应该**还有 `<stem>-poster.html`(已 step 5 删)
+- [ ] `/tmp/<stem>-poster-raw.png` 已被 crop 脚本删除
 
 ---
 
@@ -157,11 +190,18 @@ python3 <SKILL_DIR>/scripts/crop_and_share.py \
 
 ## 输出约定
 
+**Transcript 目录最终只有 2 个产物**:
+
 | 文件 | 用途 |
 |---|---|
 | `<stem>.html` | 双语 HTML reader(BPR 主输出) |
-| `<stem>-poster.html` | 海报源 HTML |
-| `<stem>-poster-hidpi.png` | 2160 宽,2x retina,文档归档用 |
-| `<stem>-poster-share.png` | 1080 宽,~2MB,直接发朋友圈 / Telegram / Slack |
+| `<stem>-poster.png` | 2160 宽,2x retina,归档 + 分享通用 |
 
-四个全部落到 `<output_dir>`(默认 `~/Documents/Transcript/`),**不另开子目录**。
+中间产物全部放 `/tmp/`,跑完手动清理(crop 脚本会自动删 raw,但 poster.html 要 step 5 显式删):
+
+| 中间文件(临时,/tmp 下) | 何时删 |
+|---|---|
+| `/tmp/<stem>-poster.html` | step 5 显式 `rm` |
+| `/tmp/<stem>-poster-raw.png` | crop 脚本自动删 |
+
+需要分享小图自己 `sips -Z 1080 <stem>-poster.png --out <stem>-poster-share.png`。

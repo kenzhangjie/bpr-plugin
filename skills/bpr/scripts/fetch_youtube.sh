@@ -36,9 +36,26 @@ cd "$OUT_DIR"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Cookie strategy: YouTube increasingly blocks unauthenticated requests
+# ("Sign in to confirm you're not a bot"). Try Chrome cookies first, fall
+# back to no cookies. Browsers tried in order: chrome, safari, firefox, edge.
+COOKIE_BROWSER=""
+for b in chrome safari firefox edge; do
+  if yt-dlp --cookies-from-browser "$b" --simulate --quiet "$URL" >/dev/null 2>&1; then
+    COOKIE_BROWSER="$b"
+    echo "→ Using cookies from: $b"
+    break
+  fi
+done
+if [[ -z "$COOKIE_BROWSER" ]]; then
+  echo "→ No browser cookies usable, trying anonymous (may fail with bot check)"
+fi
+COOKIE_ARG=""
+[[ -n "$COOKIE_BROWSER" ]] && COOKIE_ARG="--cookies-from-browser $COOKIE_BROWSER"
+
 # 1. metadata (title / uploader / description / date / duration)
 echo "→ Fetching metadata..."
-yt-dlp --dump-json --skip-download "$URL" \
+yt-dlp $COOKIE_ARG --dump-json --skip-download "$URL" \
   | python3 -c '
 import json, sys
 d = json.load(sys.stdin)
@@ -53,7 +70,7 @@ echo "  saved metadata.json"
 
 # 2. subs — prefer uploaded, fall back to auto-generated
 echo "→ Fetching subtitles (prefer uploaded, fallback auto)..."
-yt-dlp \
+yt-dlp $COOKIE_ARG \
   --write-subs --write-auto-subs \
   --sub-langs "en-orig,en,en-GB,en-US" \
   --skip-download \
