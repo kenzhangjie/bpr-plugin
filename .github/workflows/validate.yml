@@ -82,8 +82,9 @@ jobs:
           "
 
       - name: Check no hardcoded user paths leaked
+        # 排除 CONTRIBUTING.md — 它合法地需要在文档里提到这些 pattern
         run: |
-          if grep -rn '/Users/\|/home/' skills/ README.md CHANGELOG.md CONTRIBUTING.md 2>/dev/null; then
+          if grep -rn '/Users/\|/home/' skills/ README.md CHANGELOG.md 2>/dev/null; then
             echo '✗ Found hardcoded user paths above — please relativize'
             exit 1
           fi
