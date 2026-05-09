@@ -7,6 +7,23 @@ and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-09
+
+### Added
+- `scripts/build_index.py` — 扫 Transcript 目录重建 landing `index.html`
+- `scripts/extract_metadata.py` — 从博客 URL 抓发布日期 + source slug(7 种策略)
+- SKILL.md step 0:发布日期提取要求(博客调 `extract_metadata.py`,YouTube 用 metadata.json)
+- SKILL.md step 9:每次跑完重建 landing index
+- SKILL.md step 10:每次跑完 vercel 部署到 bpr.ken.solar
+
+### Changed
+- 海报触发从修饰词 (`海报` / `分享版` / `poster`) 改为子命令前缀 `/bpr all <内容>`
+- `templates/poster-template.html` 从 `references/` 移到 `templates/`(对齐 base.html 的位置)
+- 文件名规则强化:日期 = 内容发布日期(必跑 extract_metadata.py),拿不到必须问用户,不再静默用今天
+
+### Removed
+- 修饰词 `海报` / `分享版` / `poster` 的支持(被 `/bpr all` 取代)
+
 ## [1.0.0] - 2026-05-07
 
 ### Added
@@ -30,5 +47,6 @@ and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - 文件名四种 pattern:single-host podcast / multi-host podcast / single-author essay / multi-author publication
 - MIT license
 
-[Unreleased]: https://github.com/kenzhangjie/bpr-plugin/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/kenzhangjie/bpr-plugin/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.1.0
 [1.0.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.0.0
