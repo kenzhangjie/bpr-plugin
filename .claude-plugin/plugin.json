@@ -1,7 +1,7 @@
 {
   "name": "bpr",
   "description": "把英文 podcast/transcript/字幕/博客 essay 转成编辑设计风格的双语阅读 HTML(可选海报模式)",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": {
     "name": "kenzhangjie",
     "email": "ken.zhangjie@gmail.com"

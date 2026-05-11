@@ -7,6 +7,27 @@ and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-11
+
+### Added
+- `scripts/build_index.py` major upgrade (synced from production-vendored version,
+  37 KB ↑ from 12 KB):
+  - `infer_tags()` — auto-detect format / topic tags from h1 + zh + eyebrow content
+  - Tag filter UI (`tag-chip` buttons, JS filter, count badges)
+  - Separate `posters.html` page — visual gallery for entries with `-poster.png`
+  - Image lightbox modal for poster preview
+  - OpenGraph meta tags (`og:title` / `og:image` / `og:url`) for social sharing
+  - "Latest card" URL detection — surfaces newest poster as OG image
+  - Top-nav link to posters page from index
+- Optional `private/` link in index meta-bar — renders only when
+  `~/Documents/Transcript/private/` exists locally. Lets you surface a
+  password-protected section (e.g. staticrypt-encrypted page) without forcing
+  other users to have one.
+
+### Changed
+- `collect_entries()` now skips both `index.html` and `posters.html`
+- Build output now includes both `index.html` and `posters.html` in one run
+
 ## [1.1.0] - 2026-05-09
 
 ### Added
@@ -47,6 +68,7 @@ and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - 文件名四种 pattern:single-host podcast / multi-host podcast / single-author essay / multi-author publication
 - MIT license
 
-[Unreleased]: https://github.com/kenzhangjie/bpr-plugin/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/kenzhangjie/bpr-plugin/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.2.0
 [1.1.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.1.0
 [1.0.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.0.0
