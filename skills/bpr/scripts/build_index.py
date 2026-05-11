@@ -483,15 +483,6 @@ def render_index(entries: list[dict]) -> str:
     count = len(entries)
     poster_count = sum(1 for e in entries if e.get("poster_href"))
 
-    # Optional private area link — render only if `Transcript/private/` exists.
-    # This lets ken's deployment surface a 🔒 entry without forcing other users
-    # of this plugin to have a private directory (avoids 404 dead links).
-    private_link_html = (
-        '<div><strong>私域</strong><a href="private/">🔒 进入 →</a></div>'
-        if (TRANSCRIPT_DIR / "private").exists()
-        else ""
-    )
-
     # build tag filter chips — count entries per tag, only show tags with >=1
     tag_counts: dict[str, int] = {}
     for e in entries:
@@ -780,7 +771,6 @@ def render_index(entries: list[dict]) -> str:
         <div><strong>含海报</strong><a href="posters.html">{poster_count} 张 →</a></div>
         <div><strong>更新</strong>{today}</div>
         <div><strong>站点</strong><a href="https://ken.solar">ken.solar</a></div>
-        {private_link_html}
       </div>
     </header>
 

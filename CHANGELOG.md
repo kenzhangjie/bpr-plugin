@@ -7,6 +7,15 @@ and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-05-11
+
+### Removed
+- Optional `/private/` link in index meta-bar(v1.2.0 加的功能)。
+  原本的意图是 "让你给私有内容留个入口",但实际使用中发现:
+  既然有内容,通常会单独绑子域名(`private.example.com`)再 rewrite,
+  在公开主站 surface 一个 `/private/` 链接反而泄露了私域存在。
+  把这逻辑彻底移除,private 内容由用户自己决定怎么链。
+
 ## [1.2.0] - 2026-05-11
 
 ### Added
@@ -68,7 +77,8 @@ and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - 文件名四种 pattern:single-host podcast / multi-host podcast / single-author essay / multi-author publication
 - MIT license
 
-[Unreleased]: https://github.com/kenzhangjie/bpr-plugin/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/kenzhangjie/bpr-plugin/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.3.0
 [1.2.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.2.0
 [1.1.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.1.0
 [1.0.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.0.0

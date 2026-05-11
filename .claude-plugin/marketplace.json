@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Bilingual Podcast Reader — turn English podcasts/essays into editorial-style bilingual HTML",
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
   "plugins": [
     {
       "name": "bpr",
       "source": "./",
       "description": "把英文 podcast/transcript/字幕/博客 essay 转成编辑设计风格的双语阅读 HTML",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "author": {
         "name": "kenzhangjie",
         "email": "ken.zhangjie@gmail.com"
