@@ -7,6 +7,39 @@ and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-05-13
+
+### Added
+- **`scripts/fetch_xiaoyuzhou.sh`** — 小宇宙(xiaoyuzhoufm.com)episode 抓取脚本。
+  curl 拿 og:audio meta → 下载 mp3/m4a → 写 metadata.json(title / podcast /
+  publish_date / audio_url)。**不内置转录**——由调用方走飞书妙记
+  (lark-minutes skill: drive +upload → minutes +upload → vc +notes)。
+- **`scripts/fetch_bilibili.sh`** — Bilibili 抓取脚本。yt-dlp 包装,先尝试
+  uploaded subs(zh-CN / zh-Hans / zh / ai-zh / en)→ 没字幕则下载
+  bestaudio[m4a] 给妙记转录。默认带 `--cookies-from-browser chrome` 应对
+  会员/私人视频。
+- **中文模式 (Chinese-Only Mode)** — CJK 字符 ≥ 60% 自动判定为中文素材,
+  **跳过翻译三步法**,改走 TL;DR + 🔥 非共识 takes + 章节回顾 的浓缩结构。
+  - 新 CSS:`.contrarian` / `.contrarian-quote` / `.contrarian-why` /
+    `.ch-summary` / `.ch-pull` / `body[data-mode="zh-only"]` 等
+  - 完整规范见 `references/rules.md` "中文模式 (Chinese-Only Mode)" section
+  - 非共识 section 是中文模式的灵魂——做不好就是简陋摘要器,
+    严格按 rules 里的写作原则执行
+
+### Changed
+- **SKILL.md 核心步骤表** — 新增 step 2.5 "语言检测",在预处理之后、章节切分
+  之前判定语言;中文素材绕开 step 5 翻译。
+- **`references/rules.md` URL 分支表** — 加 xiaoyuzhou.fm + bilibili.com 两行,
+  新增"小宇宙 / Bilibili → 飞书妙记 一站式流程" section 详细列出 lark-cli
+  drive +upload → minutes +upload → vc +notes 的完整 pipeline。
+- **`templates/base.html` 底部说明区** — 加 CHINESE-ONLY MODE 模板示例
+  (TL;DR + contrarian + ch-summary 怎么写)。
+
+### Notes
+- 中文模式判定**完全自动**,不接受用户修饰词覆盖——保持判定单一来源。
+- 飞书妙记转录依赖 lark-cli + 个人空间额度。**首次使用**前需
+  `lark-cli auth login`(详见 lark-shared skill)。
+
 ## [1.3.0] - 2026-05-11
 
 ### Removed

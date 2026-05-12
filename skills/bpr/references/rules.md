@@ -31,7 +31,9 @@
 |---|---|
 | 普通博客 / essay(Anthropic Blog / nav.al / paulgraham.com / 公开 Substack / Medium / Stratechery 公开期等)| **curl 抓**(verbatim 原文,**不要用 WebFetch**——它会把长文压缩成摘要)→ 走正常流程 |
 | **YouTube** | 走"YouTube 一站式流程"(下面) |
-| Apple Podcasts / Spotify / Overcast | 不能直接抓,先问用户能不能给 YouTube URL(同期一般两边都有) |
+| **小宇宙 / Xiaoyuzhou**(`xiaoyuzhoufm.com/episode/<id>`)| 走"小宇宙 / Bilibili → 飞书妙记 一站式流程"(下面) |
+| **Bilibili / B 站**(`bilibili.com/video/BV<id>` / `b23.tv/<short>`)| 走"小宇宙 / Bilibili → 飞书妙记 一站式流程"(下面),先尝试 yt-dlp 字幕,无字幕则下载音频走妙记 |
+| Apple Podcasts / Spotify / Overcast | 不能直接抓,先问用户能不能给 YouTube/小宇宙 URL(同期一般多平台都有) |
 | Paywall / 登录墙(WSJ / NYT / 付费 Substack)| curl 失败时**直接告诉用户**抓不到,让 ta 粘 raw text |
 | PDF 链接 | 让用户先下载到本地,再 `/bpr <文件路径>` |
 
@@ -147,6 +149,105 @@ cat "$WORKDIR/metadata.json"
 - 抓回来内容只有 `<title>` + 几行 description → 抓失败,提示用户粘 raw text
 - 字数 < 500 → 多半是简介页或被截断,同样提示
 - 抓到完整正文 → 走正常流程
+
+### 小宇宙 / Bilibili → 飞书妙记 一站式流程
+
+YouTube 自带字幕,所以 `fetch_youtube.sh` 一步出 transcript。**小宇宙 / B 站没有公开字幕 API**,所以流程多一步:**下载音频 → 走飞书妙记转录 → 拿逐字稿**。
+
+**前置依赖**:
+- `lark-cli`(飞书 CLI 已装好且 `auth login` 完成)
+- 飞书账号有妙记上传额度
+- `yt-dlp`(只 B 站需要)
+
+#### 小宇宙(xiaoyuzhoufm.com)
+
+**Step A · 拉音频 + 元数据**
+
+```bash
+WORKDIR=$(mktemp -d /tmp/bpr-xyz-XXXX)
+~/.claude/plugins/cache/bpr-marketplace/bpr/<ver>/skills/bpr/scripts/fetch_xiaoyuzhou.sh "<URL>" "$WORKDIR"
+```
+
+成功后 `$WORKDIR/` 下有:
+- `audio.m4a` (或 `audio.mp3`) — 原始音频文件
+- `metadata.json` — `title` / `podcast` / `publish_date` / `audio_url` / `description`
+
+#### Bilibili(bilibili.com/video/BV...)
+
+**Step A · yt-dlp + 字幕尝试 + 音频回退**
+
+```bash
+WORKDIR=$(mktemp -d /tmp/bpr-bili-XXXX)
+~/.claude/plugins/cache/bpr-marketplace/bpr/<ver>/skills/bpr/scripts/fetch_bilibili.sh "<URL>" "$WORKDIR"
+```
+
+脚本逻辑:
+1. 先试 uploaded subs(zh-CN / zh-Hans / zh / ai-zh / en)→ 有则清洗成 `transcript.txt`,跳过妙记
+2. 字幕不存在 → 下载 `bestaudio[ext=m4a]` 到 `audio.m4a`,走妙记
+3. **需要 Chrome cookie**(私人/会员视频),已默认开启 `--cookies-from-browser chrome`
+
+#### Step B · 飞书妙记转录(小宇宙必跑,B 站无字幕时跑)
+
+```bash
+AUDIO="$WORKDIR/audio.m4a"   # 或 audio.mp3
+
+# 1. 上传到飞书云空间,拿 file_token
+FILE_TOKEN=$(lark-cli drive +upload "$AUDIO" --as user 2>&1 | grep -oE 'file_token[: =]+["]?[A-Za-z0-9_-]+' | grep -oE '[A-Za-z0-9_-]{20,}' | tail -1)
+echo "file_token: $FILE_TOKEN"
+
+# 2. 用 file_token 生成妙记,拿 minute_url
+MINUTE_URL=$(lark-cli minutes +upload --file-token "$FILE_TOKEN" --as user 2>&1 | grep -oE 'https://[^/]+/minutes/[A-Za-z0-9]+' | head -1)
+MINUTE_TOKEN="${MINUTE_URL##*/}"
+echo "minute_token: $MINUTE_TOKEN"
+
+# 3. 等妙记后台 AI 转录完成(短音频 1-3 分钟,长 30 分钟+ 视情况)
+# 妙记后台异步处理,需要轮询 vc +notes 直到返回逐字稿
+lark-cli vc +notes --minute-tokens "$MINUTE_TOKEN" --as user > "$WORKDIR/notes.json"
+
+# 4. 从 notes.json 提取逐字稿到 transcript.txt
+python3 -c "
+import json
+data = json.load(open('$WORKDIR/notes.json'))
+# 妙记返回结构因版本而异,常见 transcript / sentences / utterances
+# 兼容多种:
+text = data.get('transcript') or data.get('text', '')
+if not text and 'sentences' in data:
+    text = '\n'.join(s.get('content', s.get('text', '')) for s in data['sentences'])
+print(text)
+" > "$WORKDIR/transcript.txt"
+```
+
+**轮询妙记完成**:妙记 AI 异步处理。第一次 `vc +notes` 可能返回"processing"。建议:
+```bash
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  RESULT=$(lark-cli vc +notes --minute-tokens "$MINUTE_TOKEN" --as user 2>&1)
+  if echo "$RESULT" | grep -qE 'transcript|sentences|utterances'; then
+    echo "$RESULT" > "$WORKDIR/notes.json"
+    break
+  fi
+  echo "  still processing... wait 30s (attempt $i/10)"
+  sleep 30
+done
+```
+
+#### Step C · 喂给 BPR 正常流程
+
+把 `$WORKDIR/transcript.txt` + `$WORKDIR/metadata.json` 当作 transcript 输入。
+注意 metadata 字段命名跟 YouTube 略不同:
+- 小宇宙:`title` / `podcast` / `publish_date`
+- B 站:`title` / `uploader` / `upload_date`
+
+→ 在 SKILL.md hero kicker 渲染时按 source 字段(`xiaoyuzhou` / `bilibili` / `youtube`)选不同模板。
+
+#### 妙记常见问题
+
+| 问题 | 修法 |
+|---|---|
+| `lark-cli` 未认证 | `lark-cli auth login` |
+| 妙记说还在处理 | 增加轮询次数或拉长间隔(长音频 > 60min 可能要 5-10 分钟) |
+| 转录质量差(说话人多 / 杂音多) | 妙记本身限制,接受。可在 BPR 翻译阶段适度修正明显错词 |
+| `--as user` vs `--as bot` | 妙记功能必须 `--as user`(bot 拿不到个人空间妙记) |
+| 文件超大上传失败 | `drive +upload` 默认支持分片;失败时检查 lark 上传额度 |
 
 ---
 
@@ -353,3 +454,122 @@ CSS 已经写在 `templates/base.html`(`.bilingual` / `.bilingual .en` / `.bilin
 - 用户明确要求"只排英文" → 跳过中文,仅输出英文版
 - 用户明确要求"只要中文" → 跳过英文,仅输出中文版
 - 默认行为(无修饰词)= 双语对照
+
+---
+
+## 中文模式 (Chinese-Only Mode)
+
+**触发条件:CJK 字符占 transcript 主体 ≥ 60%** —— 自动检测,**不需要用户加修饰词**。
+
+### 为什么单独一套?
+
+中文 podcast / blog / 访谈不需要翻译,逐句双语对照纯属浪费篇幅。读者真正想从中文内容里拿到的是:
+1. **可扫读的摘要**(TL;DR,5-15 条)
+2. **非共识的判断**(嘉宾说出来的反直觉 / 反主流的洞见)
+3. **章节回顾**(每章 200-400 字浓缩)
+
+——本质是从"逐字稿"压缩到"读书笔记"。
+
+### 语言检测算法
+
+```python
+def detect_language(text: str) -> str:
+    """Return 'zh' if Chinese-dominant, 'en' otherwise."""
+    cjk = sum(1 for c in text if '一' <= c <= '鿿')
+    latin = sum(1 for c in text if 'a' <= c.lower() <= 'z')
+    total = cjk + latin
+    if total < 100: return 'en'  # 太短无法判断,默认双语
+    return 'zh' if cjk / total >= 0.6 else 'en'
+```
+
+**判定时机**:在预处理(Step 2)之后、章节切分(Step 3)之前。一旦判定中文,**整个流程切到中文分支**。
+
+### 中文模式输出结构
+
+```
+Hero
+  - kicker:{podcast} with {host} · {YYYY-MM-DD} · 中文整理
+  - h1:中文标题(直接用原标题,不需翻译)
+  - hero-zh:一句话概括(20-40 字)
+  - hero-lede:最核心金句(选一条) + 一段背景(80-120 字)
+─────────────────
+TL;DR · 速读 (5-15 条)
+  - 每条:加粗中文论点 + 一句解释(不需要英文 quote / context 双语三明治结构)
+─────────────────
+🔥 非共识 · Contrarian Takes (3-8 条)
+  - 每条:嘉宾原话引用(中文 verbatim,带 .pull 样式)
+  - 配一个 "为什么非共识" 短解释 (中文,1-2 句)
+  - 可选:多数人怎么想(对比锚点)
+─────────────────
+章节回顾 (8-12 章,可选)
+  - 每章 200-400 字中文摘要(不是 verbatim)
+  - 保留章节级时间戳(如有)
+  - 不再有 .bilingual 双语对照块
+─────────────────
+Footer(来源 + 元信息)
+```
+
+### 中文模式与 podcast / essay 模式的区别
+
+| 维度 | 英文双语模式 | 中文模式 |
+|---|---|---|
+| 翻译三步法 | ✓ 每段都跑 | ✗ 不跑 |
+| `.bilingual` 双语对照块 | ✓ 句级 | ✗ 不渲染 |
+| `.turn-head` speaker / timestamp | 视情况渲染 | 视情况渲染(可保留) |
+| TL;DR 4 元素结构 | 中文论点 + 英文金句 + 英文上下文 + 中文解释 | **仅 2 元素**:中文论点 + 中文解释 |
+| **非共识 section** | ✗ 不渲染 | ✓ **必须有** |
+| 章节正文 | 逐句双语对照 | 浓缩中文摘要 |
+
+### 非共识 section 写作原则
+
+这是中文模式的灵魂。**做不好,整篇就是简陋摘要器**。
+
+**什么算非共识**:
+- 嘉宾说出来跟**主流认知不一样**的判断(例:"AGI 5 年内"在 2020 是非共识,2026 是共识)
+- **反直觉**的因果(例:"做更少的事才能做更多")
+- **嘉宾独有的判断**,你在别处听不到(例:Naval 的 specific knowledge、PG 的 live in the future)
+- **行业内部人才知道的内幕逻辑**(例:"国内 AI 创业 80% 资源花在合规上")
+
+**什么不算非共识**:
+- 复述主流观点(❌ "AI 会改变所有行业")
+- 数据陈述(❌ "我们这个季度增长了 30%"——这是事实不是判断)
+- 老生常谈的鸡汤(❌ "保持初心很重要")
+
+**格式**:
+```html
+<section class="contrarian">
+  <div class="contrarian-label">🔥 非共识 · Contrarian Takes</div>
+  <div class="contrarian-item">
+    <p class="contrarian-quote">"原话引用,verbatim 中文"</p>
+    <p class="contrarian-why"><strong>为什么非共识 · </strong>多数人觉得 X,他说 Y,因为 Z。</p>
+  </div>
+  ...
+</section>
+```
+
+CSS 写在 `templates/base.html` 的"中文模式扩展样式"section。
+
+### 章节回顾(中文模式专属)
+
+跟英文双语模式的 `.bilingual` 句级对照完全不同——这里是**浓缩摘要**,200-400 字一章。
+
+```html
+<section class="chapter zh-only" id="chN">
+  <div class="ch-num">Chapter 0N</div>
+  <h2>章节中文标题</h2>
+  <div class="ch-range">15:30 — 28:45 · 关键词概括</div>
+  <div class="ch-summary">
+    <p>本章 200-400 字的中文浓缩,抓住核心论点 + 关键证据 + 嘉宾态度。
+    不是 verbatim,允许编辑取舍。但**不能编造嘉宾没说的话**。</p>
+    <p>(如有金句)<span class="ch-pull">"verbatim 嘉宾原话"</span></p>
+  </div>
+</section>
+```
+
+### 文件名约定(中文模式)
+
+文件名跟双语模式一样,**但日期、source slug、嘉宾名等元数据要从中文 metadata 抓**:
+- 小宇宙:`{date}_{podcast}_{host}_{topic}.html`(host slug 用拼音)
+- B 站:`{date}_{uploader}_{topic}.html`
+
+例:`2026-05-13_kechuang-50-ren_zhang-yiming_AI-and-bytedance.html`(科创 50 人:张一鸣谈 AI 与字节)

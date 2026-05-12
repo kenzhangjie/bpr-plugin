@@ -1,6 +1,6 @@
 ---
 name: bpr
-description: 把英文 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长文 article 转换为编辑设计风格的双语阅读 HTML。当用户输入 "/bpr" 后跟字幕、transcript、播客文本、博客 URL 或粘贴的英文长文,或明确要求"双语阅读器"/"podcast 整理"/"博客整理"时触发。覆盖 SRT、纯文本 transcript、有时间戳的 transcript、博客/essay 四种输入。输出单文件 HTML,包含 Hero、TL;DR、章节正文、目录、深色模式。
+description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长文 article 转换为编辑设计风格的阅读 HTML。**英文**素材默认双语对照;**中文**素材自动切换到 "TL;DR + 非共识 + 章节回顾" 浓缩模式(CJK ≥ 60% 自动判定)。当用户输入 "/bpr" 后跟字幕、transcript、播客文本、博客 URL 或粘贴的长文,或明确要求"双语阅读器"/"podcast 整理"/"博客整理"时触发。覆盖 SRT、纯文本 transcript、有时间戳的 transcript、博客/essay 四种内容;URL 输入支持 YouTube / 小宇宙 / Bilibili。输出单文件 HTML,包含 Hero、TL;DR、(中文模式) 非共识 takes、章节正文、目录、深色模式。
 ---
 
 # BPR · Bilingual Podcast / Essay Reader
@@ -15,13 +15,14 @@ description: 把英文 podcast transcript / 字幕 / 访谈文本 / 博客 essay
 
 | # | 步骤 | 加载哪些 reference |
 |---|---|---|
-| 0 | URL 输入预处理 + **提取发布日期**(YouTube → `scripts/fetch_youtube.sh`;blog → `scripts/extract_metadata.py`,curl 抓页面跑 7 种策略) | `references/rules.md` "URL 输入处理" + "发布日期提取" |
+| 0 | URL 输入预处理 + **提取发布日期**(YouTube → `scripts/fetch_youtube.sh`;**小宇宙** → `scripts/fetch_xiaoyuzhou.sh` + 飞书妙记;**Bilibili** → `scripts/fetch_bilibili.sh` + 飞书妙记;blog → `scripts/extract_metadata.py`,curl 抓页面跑 7 种策略) | `references/rules.md` "URL 输入处理" + "发布日期提取" |
 | 1 | 识别输入类型(SRT / 带时间戳 transcript / 纯文本 transcript / blog essay) | — |
 | 2 | 预处理(合并跨条句、提取说话人、标注时间戳;auto-subs 需要重断句+加标点) | — |
+| **2.5** | **🆕 语言检测**:统计 CJK 字符占比。**≥ 60% → 切到中文模式**(跳过 step 5 翻译,改走 TL;DR + 非共识 + 章节回顾结构);**< 60% → 英文双语模式**(继续原流程)| `references/rules.md` "中文模式 (Chinese-Only Mode)" |
 | 3 | 章节切分(按下方"自适应"表) | — |
-| 4 | 提炼 TL;DR(按下方"自适应"表 + 描述性 h2) | `references/rules.md` 看每条 TL;DR 的 4 元素格式 |
-| 5 | **逐句翻译**(三步法,每章每段都跑,不跳过) | **`references/translation-prompt.md`** 必读 |
-| 6 | 生成 HTML | **`templates/base.html`** copy 骨架 + `references/rules.md` 看双语对照 / inline link 规范 |
+| 4 | 提炼 TL;DR(按下方"自适应"表 + 描述性 h2)+(**中文模式**)非共识 takes | `references/rules.md` 看每条 TL;DR 的 4 元素格式 + 中文模式的 2 元素格式 |
+| 5 | **逐句翻译**(三步法,每章每段都跑,不跳过)— **仅英文双语模式跑此步**,中文模式跳过 | **`references/translation-prompt.md`** 必读 |
+| 6 | 生成 HTML | **`templates/base.html`** copy 骨架 + `references/rules.md` 看双语对照 / inline link 规范 / 中文模式版型 |
 | 7 | 质量自检 | `references/checklist.md` |
 | 8 | **(可选)海报阶段**:仅当命令以 `/bpr all` 开头时跑 | **`references/poster-rules.md`** + `templates/poster-template.html` + `scripts/crop_and_share.py` |
 | 9 | **重建 landing index**(每次都跑):扫 Transcript 目录所有 `*.html` → 重新生成 `index.html` | `scripts/build_index.py` |
@@ -29,6 +30,8 @@ description: 把英文 podcast transcript / 字幕 / 访谈文本 / 博客 essay
 
 > **加载策略**:不要在第 1 步就读完所有 reference。只在到达对应步骤时再读对应文件,节省 context。
 > **YouTube URL 输入**:走 step 0 调用 `scripts/fetch_youtube.sh`,**不要**假装能直接 WebFetch 到 transcript。
+> **小宇宙 / Bilibili URL 输入**:走 step 0 调用对应 fetch 脚本,**没字幕的内容必经飞书妙记转录**——详见 `references/rules.md` "小宇宙 / Bilibili → 飞书妙记 一站式流程"。
+> **中文判定**(step 2.5):**完全自动**,不接受用户用修饰词覆盖。CJK ≥ 60% → 中文模式,否则双语。
 > **Step 9 + 10 注意**:macOS 文件系统大小写不敏感但**保留**——见 `lessons-learned.md` L5。如果 Transcript 目录里有遗留的 `INDEX.html`(大写),build_index.py 会"覆盖"内容但保留大写文件名,Vercel 不会把它当 root,bpr.ken.solar 会 404。修法:`rm INDEX.html` 再跑 build_index。
 
 ## 自适应规模
@@ -66,18 +69,26 @@ description: 把英文 podcast transcript / 字幕 / 访谈文本 / 博客 essay
 
 ## 输入模式差异
 
-### Podcast / Interview / 访谈 transcript
+### Podcast / Interview / 访谈 transcript (英文)
 - 渲染 `.turn / .speaker / .timestamp`
 - Hero kicker:`{Podcast} with {Host} · {YYYY-MM-DD} · 双语整理`
   → 主持人 / 嘉宾从原文提取,**4 个 podcast 模板范例**见 `lessons-learned.md` L1
 - 文件名 → 见上方"输出"章节的四种 pattern
 
-### Blog post / Essay / 单作者长文
+### Blog post / Essay / 单作者长文 (英文)
 - **不**渲染 `.turn / .speaker / .timestamp`,正文用 `.body-block` + `.bilingual` 句级对照
 - Hero kicker:`{Publication} · Essay · {YYYY-MM-DD}`
   例:`Anthropic Blog · Essay · 2025-04-29` / `nav.al · Essay · 2024-04-28` / `Paul Graham · Essay · 2025-XX-XX`
 - `.chapter-meta` 用关键词概括,不放时间戳
 - 文件名 → 见上方"输出"章节的四种 pattern
+
+### 🆕 中文模式 (Chinese-Only Mode)
+- 触发:step 2.5 检测到 CJK ≥ 60%(完全自动)
+- **不**跑翻译三步法,正文是浓缩中文摘要,不是逐句对照
+- Hero kicker:`{Podcast} with {Host} · {YYYY-MM-DD} · 中文整理`(关键词是"中文整理",跟英文版的"双语整理"区分)
+- 结构:Hero → TL;DR(中文 2 元素)→ 🔥 **非共识 takes**(中文 verbatim 引用 + 为什么非共识)→ 章节回顾(200-400 字/章浓缩)→ Footer
+- **非共识 section 是中文模式的灵魂**——做不好整篇就是简陋摘要器,严格按 `rules.md` "非共识 section 写作原则" 写
+- 完整规范、CSS 类名(`.contrarian` / `.contrarian-quote` / `.contrarian-why`)、章节模板见 `references/rules.md` "中文模式 (Chinese-Only Mode)" section
 
 ## 硬规则(必读 → `references/lessons-learned.md`)
 

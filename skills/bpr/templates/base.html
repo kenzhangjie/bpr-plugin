@@ -267,6 +267,70 @@
       color:var(--ink);
     }
 
+    /* ── Chinese-only mode: contrarian section + chapter summary ─ */
+    /* 中文模式特有:🔥 非共识 takes / 章节浓缩摘要 / TL;DR 简化版型 */
+    .contrarian{
+      margin:60px 0 80px; padding:36px 0;
+      border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
+    }
+    .contrarian-label{
+      font-family:var(--sans); font-size:11px; letter-spacing:.22em;
+      text-transform:uppercase; color:var(--accent);
+      margin-bottom:10px;
+    }
+    .contrarian h2{
+      font-family:var(--serif-zh); font-weight:700;
+      font-size:30px; line-height:1.2; margin:0 0 32px;
+      color:var(--ink);
+    }
+    .contrarian-item{
+      counter-increment:contra;
+      position:relative;
+      padding:22px 0 22px 44px;
+      border-top:1px dashed var(--rule);
+    }
+    .contrarian-item:first-of-type{border-top:none}
+    .contrarian-item::before{
+      content:counter(contra,decimal-leading-zero);
+      position:absolute; left:0; top:24px;
+      font-family:var(--sans); font-size:13px; font-weight:500;
+      color:var(--accent); letter-spacing:.05em;
+    }
+    .contrarian{counter-reset:contra}
+    .contrarian-quote{
+      font-family:var(--serif-zh); font-weight:600;
+      font-size:18px; color:var(--ink);
+      line-height:1.65; margin:0 0 12px;
+      border-left:3px solid var(--accent); padding-left:16px;
+    }
+    .contrarian-why{
+      font-family:var(--serif-zh); font-size:14.5px;
+      color:var(--ink-soft); line-height:1.7; margin:0;
+    }
+    .contrarian-why strong{color:var(--accent); font-weight:600}
+
+    /* 中文模式章节正文(浓缩摘要,不是双语对照)*/
+    .ch-summary{
+      font-family:var(--serif-zh); font-size:16px;
+      color:var(--ink); line-height:1.85;
+      margin:24px 0;
+    }
+    .ch-summary p{margin:0 0 14px}
+    .ch-pull{
+      font-family:var(--serif-zh); font-style:italic;
+      color:var(--accent); font-weight:500;
+      display:block; padding:8px 0 8px 16px;
+      border-left:2px solid var(--accent-soft);
+      margin:12px 0;
+    }
+
+    /* 中文模式 TL;DR 简化:只有 claim + explain,没有 quote / context 双语三明治 */
+    .tldr.zh-only .tldr-quote,
+    .tldr.zh-only .tldr-context{display:none}
+
+    /* 全局中文模式标记(可选,放在 body 上方便整体调整)*/
+    body[data-mode="zh-only"] .bilingual{display:none}
+
     /* ── code ─────────────────────────────────────────────────── */
     code{
       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -445,4 +509,48 @@
   CHUNKED-WRITE MODE (HTML > 30KB):
   Replace turn/body content with `<!-- BODY:chN -->` placeholder during
   initial Write. Fill via Edit per chapter. See lessons-learned.md.
+
+  ════════════════════════════════════════════════════════════════════
+  CHINESE-ONLY MODE (CJK ≥ 60% auto-detected)
+  ════════════════════════════════════════════════════════════════════
+  See references/rules.md "中文模式 (Chinese-Only Mode)" for full spec.
+
+  1. Add `data-mode="zh-only"` on <body> tag:
+     <body data-mode="zh-only">
+     (CSS rule auto-hides any leftover .bilingual blocks.)
+
+  2. TL;DR — add `zh-only` class to .tldr, items have only claim + explain:
+     <section class="tldr zh-only">
+       <div class="tldr-label">TL;DR · 速读</div>
+       <h2>描述性主题</h2>
+       <ol>
+         <li>
+           <p class="tldr-claim">中文论点(15 字内)</p>
+           <p class="tldr-explain">中文解释(≤60 字)</p>
+         </li>
+       </ol>
+     </section>
+
+  3. Insert 🔥 非共识 section after TL;DR:
+     <section class="contrarian">
+       <div class="contrarian-label">🔥 非共识 · Contrarian Takes</div>
+       <h2>描述性中文标题</h2>
+       <div class="contrarian-item">
+         <p class="contrarian-quote">"嘉宾原话引用,中文 verbatim"</p>
+         <p class="contrarian-why"><strong>为什么非共识 · </strong>多数人觉得 X,他说 Y,因为 Z。</p>
+       </div>
+       <!-- 3-8 个 .contrarian-item -->
+     </section>
+
+  4. Chapter body uses .ch-summary (浓缩摘要,不双语对照):
+     <section class="chapter" id="chN">
+       <div class="ch-num">Chapter 0N</div>
+       <h2>章节中文标题</h2>
+       <div class="ch-range">15:30 — 28:45 · 关键词</div>
+       <div class="ch-summary">
+         <p>本章 200-400 字中文浓缩,抓核心论点 + 关键证据 + 嘉宾态度。</p>
+         <p>不是 verbatim,允许编辑取舍。但**不能编造嘉宾没说的话**。</p>
+         <span class="ch-pull">"verbatim 嘉宾原话(如有金句)"</span>
+       </div>
+     </section>
 -->
