@@ -159,6 +159,46 @@ YouTube 自带字幕,所以 `fetch_youtube.sh` 一步出 transcript。**小宇�
 - 飞书账号有妙记上传额度
 - `yt-dlp`(只 B 站需要)
 
+#### ⛔ Step 0 · scope 前置检查(必跑,不要跳)
+
+2026-05 实战暴露:lark-cli 的错误提示"run lark-cli auth login --scope X"是**误导** —— 所需 scope 必须**先在 app 开发者后台开通**,才能通过 `auth login --domain` 拉到。**没开就跑 minutes / vc 命令一定 fail**,会浪费大量时间在调认证。
+
+跑流程**第一行命令**就是 scope 验证:
+
+```bash
+lark-cli auth scopes | grep -E 'minutes|vc:note' | sort -u
+```
+
+期望看到下面 **7+ 行**(缺一不行,缺一就 fail):
+
+```
+minutes:minutes.search:read         # 搜妙记列表
+minutes:minutes.basic:read          # 获取妙记基础信息
+minutes:minutes.upload:write        # 通过 file_token 生成妙记 ← lark-cli minutes +upload
+minutes:minutes.media:export        # 下载妙记音视频
+minutes:minutes:readonly            # 妙记只读
+minutes:minutes.artifacts:read      # 读总结/待办/章节产物 ← lark-cli vc +notes
+minutes:minutes.transcript:export   # 导出逐字稿       ← lark-cli vc +notes
+vc:note:read                        # 会议纪要(妙记沿用同一权限)
+```
+
+**如果缺**:
+1. 浏览器打开 https://open.feishu.cn/app → 找到 app(`lark-cli auth status` 里的 `appId`)→ **权限管理** → 搜对应 scope → 勾上 → 提交审核(自己 app 通常秒过)
+2. iTerm 跑 `lark-cli auth login --domain minutes,vc` 增量授权
+3. 再跑一次 `lark-cli auth scopes | grep minutes` 验证
+
+**未补全 scope 之前,绝对不要进入 Step A,会浪费用户时间**。
+
+#### 兜底方案:Web UI 手动上传
+
+如果 scope 审批一时半会下不来(企业管理员审核可能要小时级),走兜底路:
+1. 浏览器开 https://meetings.feishu.cn/minutes/me → 上传按钮 → 选 `$WORKDIR/audio.m4a`
+2. 等妙记 AI 转录完(4 小时音频 ~10-30 分钟)
+3. 妙记页面右上角 → 导出逐字稿(TXT)
+4. 把 TXT 文件路径给 BPR,继续 Step C(语言检测 → 中文模式 / 双语模式)
+
+这条路绕开所有 minutes scope 审核,**今天就能产出**,适合首次跑 / 紧急场景。
+
 #### 小宇宙(xiaoyuzhoufm.com)
 
 **Step A · 拉音频 + 元数据**
@@ -188,15 +228,20 @@ WORKDIR=$(mktemp -d /tmp/bpr-bili-XXXX)
 
 #### Step B · 飞书妙记转录(小宇宙必跑,B 站无字幕时跑)
 
+⚠️ **`lark-cli drive +upload` 拒绝绝对路径**(2026-05 实战发现),必须 `cd` 到 WORKDIR 用 `./filename` 相对路径:
+
 ```bash
-AUDIO="$WORKDIR/audio.m4a"   # 或 audio.mp3
+cd "$WORKDIR"   # ← 关键!不 cd 直接传 --file /tmp/... 会被 validation 拒掉
+AUDIO_BASENAME="audio.m4a"   # 或 audio.mp3
 
 # 1. 上传到飞书云空间,拿 file_token
-FILE_TOKEN=$(lark-cli drive +upload "$AUDIO" --as user 2>&1 | grep -oE 'file_token[: =]+["]?[A-Za-z0-9_-]+' | grep -oE '[A-Za-z0-9_-]{20,}' | tail -1)
+FILE_TOKEN=$(lark-cli drive +upload --file "./$AUDIO_BASENAME" --as user 2>&1 \
+  | /usr/bin/python3 -c "import json,sys;d=json.loads(''.join(l for l in sys.stdin if l.startswith('{') or not l.startswith('[')));print(d.get('data',{}).get('file_token',''))")
 echo "file_token: $FILE_TOKEN"
 
 # 2. 用 file_token 生成妙记,拿 minute_url
-MINUTE_URL=$(lark-cli minutes +upload --file-token "$FILE_TOKEN" --as user 2>&1 | grep -oE 'https://[^/]+/minutes/[A-Za-z0-9]+' | head -1)
+MINUTE_URL=$(lark-cli minutes +upload --file-token "$FILE_TOKEN" --as user 2>&1 \
+  | grep -oE 'https://[^/]+/minutes/[A-Za-z0-9]+' | head -1)
 MINUTE_TOKEN="${MINUTE_URL##*/}"
 echo "minute_token: $MINUTE_TOKEN"
 
@@ -205,11 +250,10 @@ echo "minute_token: $MINUTE_TOKEN"
 lark-cli vc +notes --minute-tokens "$MINUTE_TOKEN" --as user > "$WORKDIR/notes.json"
 
 # 4. 从 notes.json 提取逐字稿到 transcript.txt
-python3 -c "
+/usr/bin/python3 -c "
 import json
 data = json.load(open('$WORKDIR/notes.json'))
 # 妙记返回结构因版本而异,常见 transcript / sentences / utterances
-# 兼容多种:
 text = data.get('transcript') or data.get('text', '')
 if not text and 'sentences' in data:
     text = '\n'.join(s.get('content', s.get('text', '')) for s in data['sentences'])

@@ -7,6 +7,29 @@ and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-05-13
+
+### Fixed
+- **`scripts/fetch_xiaoyuzhou.sh` 元数据提取** — 加 JSON-LD PodcastEpisode 解析,
+  从 `<script type="application/ld+json">` 块里读 `datePublished`(真实发布
+  日期 YYYY-MM-DD)、`partOfSeries.name`(节目真名,例如"张小珺Jùn｜商业访谈录"
+  而不是泛指"小宇宙")、`timeRequired`(ISO 8601 时长)。
+  影响:文件名日期不再 null;hero kicker 不再写错节目名。
+- **`fetch_xiaoyuzhou.sh` / `fetch_bilibili.sh` 的 Next-step 提示** — 改用
+  相对路径调用 `lark-cli drive +upload`。实战发现 lark-cli 对 `--file` 参数有
+  unsafe-path 校验,绝对路径(如 `/tmp/bpr-xyz-XXX/audio.m4a`)会被拒;
+  必须 `cd $WORKDIR && lark-cli drive +upload --file ./audio.m4a`。
+- **`references/rules.md` 妙记流程加 Step 0 scope 前置检查** — lark-cli 错误
+  提示 "run lark-cli auth login --scope X" 是误导,所需 scope 必须先在 app
+  开发者后台开通才能拉。新增"必须存在的 7 个 minutes/vc scope"清单 +
+  `lark-cli auth scopes | grep -E 'minutes|vc:note'` 一行验证 + 兜底方案
+  (妙记 Web UI 手动上传 → 导出逐字稿,绕开所有 minutes scope 审批)。
+
+### Notes
+- 这三条都是 2026-05-13 跑 BPR v1.4.0 首次端到端测试时
+  (姚顺宇 4 小时访谈,小宇宙 episode 140)暴露的真实坑。
+  v1.4.1 是把这些教训沉淀进代码 + 文档。
+
 ## [1.4.0] - 2026-05-13
 
 ### Added

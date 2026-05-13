@@ -51,7 +51,7 @@ if [[ "$PAGE_SIZE" -lt 500 ]]; then
 fi
 echo "  page size: $PAGE_SIZE bytes"
 
-echo "→ Extracting audio URL + metadata..."
+echo "→ Extracting audio URL + metadata (og:* + JSON-LD)..."
 /usr/bin/python3 - "$PAGE" "$OUT_DIR" <<'PYEOF'
 import json
 import re
@@ -76,26 +76,66 @@ def find_meta(prop):
     )
     return unescape(m.group(1)) if m else ""
 
+# --- Pass 1: og:* meta tags (baseline) ---
 audio_url = find_meta("og:audio") or find_meta("og:audio:url") or find_meta("twitter:player:stream")
 title     = find_meta("og:title") or find_meta("twitter:title") or ""
-podcast   = find_meta("og:site_name") or "小宇宙"
+podcast   = find_meta("og:site_name") or ""
 desc      = find_meta("og:description") or find_meta("description") or ""
 pub_date  = find_meta("article:published_time") or find_meta("og:updated_time") or ""
 
-# Episode id from URL
-m = re.search(r"episode/([a-f0-9]+)", str(page_path.parent))
+# --- Pass 2: JSON-LD PodcastEpisode (richer than og:*) ---
+# 小宇宙 embeds <script type="application/ld+json">{"@type":"PodcastEpisode",...}</script>
+# which has datePublished, timeRequired, partOfSeries.name (real podcast series name)
+jsonld_pub = ""
+jsonld_series = ""
+jsonld_duration = ""
+for m in re.finditer(
+    r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>([^<]+)</script>',
+    html,
+):
+    try:
+        data = json.loads(m.group(1))
+    except Exception:
+        continue
+    if isinstance(data, list):
+        candidates = data
+    else:
+        candidates = [data]
+    for d in candidates:
+        if not isinstance(d, dict): continue
+        if d.get("@type") in ("PodcastEpisode", "Episode") or "datePublished" in d:
+            jsonld_pub      = d.get("datePublished", "") or jsonld_pub
+            jsonld_duration = d.get("timeRequired", "")  or jsonld_duration
+            series = d.get("partOfSeries") or d.get("inSeries") or {}
+            if isinstance(series, dict):
+                jsonld_series = series.get("name", "") or jsonld_series
+
+# Prefer JSON-LD values when present
+if jsonld_pub:
+    # Normalize "2026-05-11T00:00:00.000Z" → "2026-05-11"
+    pub_date = jsonld_pub.split("T")[0]
+if jsonld_series:
+    # JSON-LD series.name is the REAL podcast name (e.g. "张小珺Jùn｜商业访谈录"),
+    # whereas og:site_name is just "小宇宙" (the platform). Prefer JSON-LD.
+    podcast = jsonld_series
+elif not podcast:
+    podcast = "小宇宙"
+
+# Episode id from URL (stored in $URL by caller, parse from page <link rel=canonical> if available)
+m = re.search(r'<link\s+rel=["\']canonical["\']\s+href=["\'][^"\']*?/episode/([a-z0-9]+)', html, re.IGNORECASE)
 episode_id = m.group(1) if m else ""
 
 # Try to find audio URL from JSON-LD or __NEXT_DATA__ if og:audio is missing
 if not audio_url:
-    # Look for any .m4a or .mp3 in the HTML
+    m = re.search(r'"contentUrl"\s*:\s*"([^"]+\.(?:m4a|mp3))"', html)
+    if m: audio_url = m.group(1)
+if not audio_url:
     m = re.search(r'(https?://[^"\']+\.(?:m4a|mp3))', html)
     if m: audio_url = m.group(1)
 
 if not audio_url:
     print("ERROR: could not find audio URL on page", file=sys.stderr)
-    print("  Searched meta tags: og:audio, og:audio:url, twitter:player:stream", file=sys.stderr)
-    print("  Also tried regex for .m4a/.mp3 URLs in HTML body", file=sys.stderr)
+    print("  Searched: og:audio / og:audio:url / twitter:player:stream / JSON-LD contentUrl / regex", file=sys.stderr)
     sys.exit(5)
 
 # Clean title — 小宇宙 usually appends " | 小宇宙" suffix
@@ -106,18 +146,21 @@ meta = {
     "title":      title,
     "podcast":    podcast,
     "description": desc[:500],
-    "publish_date": pub_date,
+    "publish_date": pub_date,        # YYYY-MM-DD (real episode pubDate from JSON-LD)
+    "duration":   jsonld_duration,   # ISO 8601 e.g. "PT230M"
     "audio_url":  audio_url,
     "episode_id": episode_id,
-    "page_url":   "",  # caller knows
+    "page_url":   "",
 }
 (out_dir / "metadata.json").write_text(
     json.dumps(meta, ensure_ascii=False, indent=2),
     encoding="utf-8",
 )
-print(f"  title:     {title}")
-print(f"  podcast:   {podcast}")
-print(f"  audio:     {audio_url}")
+print(f"  title:        {title}")
+print(f"  podcast:      {podcast}")
+print(f"  publish_date: {pub_date or '(not found)'}")
+print(f"  duration:     {jsonld_duration or '(not found)'}")
+print(f"  audio:        {audio_url}")
 PYEOF
 
 # Re-read metadata to get audio URL
@@ -155,7 +198,18 @@ echo ""
 echo "✓ Done. Outputs in $OUT_DIR:"
 ls -la "$OUT_DIR/audio.$EXT" "$OUT_DIR/metadata.json"
 echo ""
-echo "Next step: transcribe via 飞书妙记 — see SKILL.md '小宇宙 / Bilibili 转录流程':"
-echo "  1. lark-cli drive +upload $AUDIO_FILE        # → file_token"
-echo "  2. lark-cli minutes +upload --file-token <file_token>  # → minute_url"
-echo "  3. lark-cli vc +notes --minute-tokens <minute_token>   # → 逐字稿"
+echo "Next step: transcribe via 飞书妙记 — see SKILL.md '小宇宙 / Bilibili → 飞书妙记 流程'."
+echo ""
+echo "⚠️  precheck: lark-cli requires 7 minutes scopes (app console must enable + user re-auth)."
+echo "    Run first:  lark-cli auth scopes | grep minutes"
+echo "    Required:   minutes:minutes.search:read / minutes:minutes.basic:read /"
+echo "                minutes:minutes.upload:write / minutes:minutes.media:export /"
+echo "                minutes:minutes:readonly / minutes:minutes.artifacts:read /"
+echo "                minutes:minutes.transcript:export"
+echo ""
+echo "⚠️  lark-cli drive +upload rejects absolute paths — MUST cd into WORKDIR first:"
+echo ""
+echo "  cd \"$OUT_DIR\""
+echo "  lark-cli drive +upload --file ./audio.$EXT --as user      # → file_token"
+echo "  lark-cli minutes +upload --file-token <file_token> --as user  # → minute_url"
+echo "  lark-cli vc +notes --minute-tokens <minute_token> --as user   # → 逐字稿"
