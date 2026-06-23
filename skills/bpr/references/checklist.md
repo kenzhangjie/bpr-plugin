@@ -9,6 +9,13 @@
 - [ ] 写完最后一章后跑 `wc -c <file>` 自检,正常区间 70-110KB(12-13 章长 podcast)
 - [ ] **若曾经在生成中出现** "API Error: socket connection closed" → 下次必须分块
 
+## 覆盖率硬闸(transcript 模式,必查 — 见 L6)
+
+- [ ] **逐字全量,不是精选/摘要**:每个发言轮次、每句都做了 `.bilingual` 对照
+- [ ] **比对源稿覆盖率**:`渲染 .turn 数 ÷ 源稿 >> 轮次数` 和 `渲染 en 句数 ÷ 源稿句数`,**任一 < ~85% = 不合格**,回 step 5 补全
+- [ ] ⚠️ **只看 en=zh 配对数相等 ≠ 自检通过**——配对齐但只覆盖半篇也会"全绿",必须额外比源稿
+- [ ] **时间戳已注入**(podcast 模式):跑过 `scripts/add_timestamps.py`,`.timestamp` 数接近 `.turn` 数(超短插话除外),时间单调递增、末值 ≤ 总时长
+
 ## 翻译
 
 - [ ] **每章每段都跑了三步法**(参 `translation-prompt.md`)——**不跳过、不偷懒、不在意 token 消耗**
@@ -86,4 +93,4 @@
 - [ ] 主要分隔符是 `_`,词内 / 多词组合用 `-`(`anton-osika_lovable-200m-arr` 而不是 `anton-osika-lovable-200m-arr`)
 - [ ] 全小写,无空格 / 中文 / 大写
 - [ ] 总长度 ≤ 80 字符,目标 50-70
-- [ ] 输出到 `/Users/ken/Documents/Transcript/`
+- [ ] 输出到 `/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/`

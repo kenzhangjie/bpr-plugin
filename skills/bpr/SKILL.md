@@ -23,10 +23,11 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 | 4 | 提炼 TL;DR(按下方"自适应"表 + 描述性 h2)+(**中文模式**)非共识 takes | `references/rules.md` 看每条 TL;DR 的 4 元素格式 + 中文模式的 2 元素格式 |
 | 5 | **逐句翻译**(三步法,每章每段都跑,不跳过)— **仅英文双语模式跑此步**,中文模式跳过 | **`references/translation-prompt.md`** 必读 |
 | 6 | 生成 HTML | **`templates/base.html`** copy 骨架 + `references/rules.md` 看双语对照 / inline link 规范 / 中文模式版型 |
-| 7 | 质量自检 | `references/checklist.md` |
+| 6.5 | **🆕 时间戳(podcast 模式默认跑,不用等用户提)**:`python3 scripts/add_timestamps.py <transcript.*.vtt> <reader.html>`,给每个 `.turn` 注入 `<span class="timestamp">`。VTT 是滚动字幕,脚本已做滚动重建,别手写解析 | `scripts/add_timestamps.py`(见 L6) |
+| 7 | 质量自检 — **含覆盖率硬闸(见 L6),不达标必须回 step 5 补全,不是只看 en=zh 配对** | `references/checklist.md` |
 | 8 | **(可选)海报阶段**:仅当命令以 `/bpr all` 开头时跑 | **`references/poster-rules.md`** + `templates/poster-template.html` + `scripts/crop_and_share.py` |
 | 9 | **重建 landing index**(每次都跑):扫 Transcript 目录所有 `*.html` → 重新生成 `index.html` | `scripts/build_index.py` |
-| 10 | **部署到 bpr.ken.solar**(每次都跑):`cd ~/Documents/Transcript && vercel --prod --yes` | — |
+| 10 | **部署到 bpr.ken.solar**(每次都跑):`cd "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript" && brctl download . && NODE_USE_ENV_PROXY=1 vercel --prod --yes`(`NODE_USE_ENV_PROXY=1` 必带:Node fetch/undici 默认不读 http_proxy,国内直连 vercel.com 会被 GFW 重置报 `socket disconnected before secure TLS`;curl 能通≠CLI 能通) | — |
 
 > **加载策略**:不要在第 1 步就读完所有 reference。只在到达对应步骤时再读对应文件,节省 context。
 > **YouTube URL 输入**:走 step 0 调用 `scripts/fetch_youtube.sh`,**不要**假装能直接 WebFetch 到 transcript。
@@ -137,7 +138,7 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 3. **复制模板到临时位置**:`cp templates/poster-template.html /tmp/<slug>-poster.html`(中间产物,不要落到 Transcript 目录)
 4. **填入内容**:用 Edit 工具改 hero / 各 section 文案 / 章节金句
 5. **Chrome 渲染**:headless,2x retina,1080×12000 画布,输出 raw PNG 到临时位置
-6. **裁剪**:`scripts/crop_and_share.py raw.png /Users/ken/Documents/Transcript/<stem>-poster.png`(直接输出最终命名,无 `-hidpi` 后缀)
+6. **裁剪**:`scripts/crop_and_share.py raw.png "/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/<stem>-poster.png"`(直接输出最终命名,无 `-hidpi` 后缀)
 7. **清理中间产物**:删除 `/tmp` 下的 poster HTML 和 raw PNG(crop 脚本已自动删 raw)
 8. **报告 2 个产物**:`<stem>.html`(双语 HTML reader)+ `<stem>-poster.png`(海报)。**不保留 poster HTML**——它是一次性中间产物。
 
@@ -159,7 +160,7 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 | 双语 HTML(主输出)| `<stem>.html` |
 | 海报(归档 + 分享)| `<stem>-poster.png`(2160 宽,2x retina) |
 
-两个文件都落到 `/Users/ken/Documents/Transcript/`。
+两个文件都落到 `/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/`。
 
 **中间产物**(`<stem>-poster.html` 和 `<stem>-poster-raw.png`)放在 `/tmp/`,跑完不要拷到 Transcript 目录。crop 脚本会自动删 raw PNG;poster HTML 由调用流程在 step 7 删除。
 
@@ -220,7 +221,7 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 
 ### 输出路径
 
-`/Users/ken/Documents/Transcript/`
+`/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/`
 
 ## 错误处理
 

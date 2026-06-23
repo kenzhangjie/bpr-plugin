@@ -5,6 +5,13 @@ All notable changes to this plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.4.2 — 2026-06-23
+
+- transcript 模式默认**逐字全量 + 覆盖率硬闸**(渲染轮次/句数 ÷ 源稿 <~85% 判不合格,回 step5 补全;不再只看 en=zh 配对)— 见 L6
+- 新增 `scripts/add_timestamps.py`:YouTube **滚动字幕重建** + 首句匹配,podcast 模式 step 6.5 默认注入 `.turn` 时间戳
+- step 10 部署命令加 `NODE_USE_ENV_PROXY=1`(国内 Node fetch 走代理,防 vercel TLS 重置)
+- lessons-learned 新增 L6;checklist 加覆盖率/时间戳两节
+
 ## [Unreleased]
 
 ## [1.4.1] - 2026-05-13

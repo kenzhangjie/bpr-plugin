@@ -236,8 +236,8 @@ macOS 默认 APFS 文件系统**大小写不敏感但保留(case-insensitive but
 
 1. **build_index.py 跑之前**先清掉任何遗留的大写 `INDEX.html`:
    ```bash
-   [ -f /Users/ken/Documents/Transcript/INDEX.html ] && \
-     rm /Users/ken/Documents/Transcript/INDEX.html
+   [ -f "/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/INDEX.html" ] && \
+     rm "/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/INDEX.html"
    ```
 
 2. **写文件用"先删后写"模式**,而不是直接 `write_text`:
@@ -260,3 +260,21 @@ macOS 默认 APFS 文件系统**大小写不敏感但保留(case-insensitive but
 ### 关联
 
 - L1-L3 都是"产物正确但显示错"——L5 加进来:产物**和**文件名都正确,但**因为 FS 大小写差异导致路由不匹配**
+
+---
+
+## L6 · 逐字稿被压成精选 + 时间戳对不上 (2026-06-22, No Priors × Lip Bu Tan)
+
+### 症状
+1. 跑 YouTube(8,528 词,111 个 `>>` 轮次)做出的 reader,只有 40 轮 / 146 句对照 —— **内容被压到约一半**,大量来回和细节(整段投资哲学、IPO/并购数字、Cadence/Synopsys 等)被丢。用户两次指出"这不是逐字稿"。
+2. 加时间戳第一次只匹配上 **4/49** 轮,其余全卡在同一个时间。
+
+### 根因
+1. **把 step 5「翻译」默默做成了「每章挑代表性句子」**,而规则要求逐句 verbatim、不省略。面对 YouTube 那种无标点、滚动重复的字幕,偷懒选了"出个好读摘要"。**而 step 7 自检只查了 en=zh 配对(内部一致性),没查"覆盖率 vs 源稿"**,所以漏网。
+2. VTT 解析器两个 bug:① 只抓 `<c>` 标签里的词,**漏掉每条 cue 的裸首词**;② **没处理 YouTube 滚动字幕**(每条 cue = 上条全文 + 新增几词),词流错乱重复 → 首句匹配全废。
+
+### 硬规则
+1. **transcript 模式默认就出逐字全量**,不许"精选/摘要"。每个发言轮次、每句都要 `.bilingual` 对照(口语词酌情保留,但不省略信息)。
+2. **step 7 覆盖率硬闸**:生成后比对源稿——`渲染的 .turn 数 / 源稿 >> 轮次数` 和 `渲染 en 句数 / 源稿句数` **任一 < ~85% = 不合格**,必须回 step 5 补全。**只看 en=zh 配对不算自检通过。**
+3. **时间戳用 `scripts/add_timestamps.py`,别手写 VTT 解析**:它做了滚动重建(只取每条 cue 新增尾词)+ 裸首词。podcast 模式 **step 6.5 默认跑**,不用等用户要求。超短插话(<4 个有辨识度的词)匹配不到就留空,不硬塞。
+4. **根因共性**:YouTube 上传/自动字幕 = 脏 + 滚动 + 有逐词时间但无干净句子/说话人结构。做逐字+时间戳本就是苦活,必须一次做满,别等用户两轮纠错。

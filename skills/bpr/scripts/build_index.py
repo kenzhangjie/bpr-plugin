@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Build /Users/ken/Documents/Transcript/{index,posters}.html from BPR HTML files.
+"""Build /Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/{index,posters}.html from BPR HTML files.
 
 This is a personal publishing tool for ken.solar — separate from the BPR plugin
 itself (which only generates per-content HTML/poster).
 
 Usage:
-  /usr/bin/python3 ~/Documents/Transcript/bin/build_index.py
+  /usr/bin/python3 "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/bin/build_index.py"
 
 Generates:
   - index.html  : landing page with bio + chronological entry list (with poster thumbs)
@@ -23,7 +23,7 @@ from datetime import date as _date
 from html import escape
 from pathlib import Path
 
-TRANSCRIPT_DIR = Path("/Users/ken/Documents/Transcript")
+TRANSCRIPT_DIR = Path("/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript")
 INDEX_PATH = TRANSCRIPT_DIR / "index.html"
 POSTERS_PATH = TRANSCRIPT_DIR / "posters.html"
 BASE_URL = "https://bpr.ken.solar"
