@@ -1,7 +1,7 @@
 {
   "name": "bpr",
   "description": "把 podcast/transcript/字幕/博客 essay 转成编辑设计风格的阅读 HTML。英文出双语对照,中文出 TL;DR+非共识+章节回顾。支持 YouTube/小宇宙/Bilibili 输入(可选海报模式)",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "author": {
     "name": "kenzhangjie",
     "email": "ken.zhangjie@gmail.com"

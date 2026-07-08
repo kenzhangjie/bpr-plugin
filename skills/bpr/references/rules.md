@@ -226,7 +226,25 @@ WORKDIR=$(mktemp -d /tmp/bpr-bili-XXXX)
 2. 字幕不存在 → 下载 `bestaudio[ext=m4a]` 到 `audio.m4a`,走妙记
 3. **需要 Chrome cookie**(私人/会员视频),已默认开启 `--cookies-from-browser chrome`
 
-#### Step B · 飞书妙记转录(小宇宙必跑,B 站无字幕时跑)
+#### Step B(推荐)· 火山引擎大模型录音识别(优先于妙记)
+
+**Ken 专用**:有 `~/.config/volc/asr.env` 的 `VOLC_API_KEY` 时,**优先走火山,不走妙记**——纯 API 无人值守(无妙记的交互授权 / scope 摩擦)、中英混说质量更高、自带词级时间戳 + 说话人分离。妙记降级为 fallback(火山报错或无密钥时)。
+
+```bash
+# fetch_xiaoyuzhou.sh / fetch_bilibili.sh 已给出音频直链(metadata.json 的 audio_url),
+# 火山可直接吃 URL,省掉重新上传那一步。
+AUDIO_URL=$(python3 -c "import json;print(json.load(open('$WORKDIR/metadata.json'))['audio_url'])")
+python3 ~/.config/volc/volc_asr.py "$AUDIO_URL" "$WORKDIR/transcript.txt"
+```
+
+输出 `transcript.txt` 是 `Speaker N HH:MM:SS.mmm` 格式(与妙记导出一致,下游无需改),
+并自动套用 `~/.config/volc/correct_table.json` 的专名硬映射(Higgsfield / Hockey Stick Growth / Midjourney …)。
+鉴权要点:火山 v3 大模型端点用 **X-Api-Key**(= `VOLC_API_KEY`),**不是** App-Key/Access-Key(后者会 401 `grant not found`)。
+
+> 转录质量仍可能有专名错词(中英混录里英文品牌名最易错)→ BPR 翻译 / 渲染阶段按上下文修正,
+> 新踩坑的无歧义专名顺手加进 `correct_table.json`,下次自动生效。
+
+#### Step B(fallback)· 飞书妙记转录(无火山密钥时;小宇宙必跑,B 站无字幕时跑)
 
 ⚠️ **`lark-cli drive +upload` 拒绝绝对路径**(2026-05 实战发现),必须 `cd` 到 WORKDIR 用 `./filename` 相对路径:
 
@@ -390,12 +408,14 @@ WebSearch query 模板:
 
 ## 每条 TL;DR 格式
 
-每条由 4 个元素组成,顺序固定:
+每条由 4 个元素组成。**DOM 书写顺序固定**(claim → quote → context → explain),**视觉顺序由 CSS `order:` 控制**(`.tldr li` 是 flex column),所以生成时照常按下面顺序写 `<p>`,不用手动调序:
 
-1. **加粗中文论点**(15 字内)— `.tldr-claim`
-2. **英文金句**(斜体,原文 ≤ 30 词)— `.tldr-quote`
-3. **英文上下文**(原文 1-2 句,40-80 词,提供金句的对话语境)— `.tldr-context`
-4. **中文解释**(≤ 60 中文字,1-2 句)— `.tldr-explain`
+1. **中文论点**(15 字内)— `.tldr-claim` ·(渲染:斜体、深色,视觉第 2)
+2. **英文金句**(原文 ≤ 30 词)— `.tldr-quote` ·(渲染:**粗体、最深、字号最大,视觉第 1 = 每条的标题**)
+3. **英文上下文**(原文 1-2 句,40-80 词,提供金句的对话语境)— `.tldr-context` ·(渲染:轻灰,视觉第 3)
+4. **中文解释**(≤ 60 中文字,1-2 句)— `.tldr-explain` ·(渲染:轻灰,视觉第 4)
+
+> 视觉层级(2026-06 调整,模板已固化):**英文金句(粗体最深)→ 中文论点(斜体深)→ 英文上下文(轻灰)→ 中文解释(轻灰)**。英文金句是每条 TL;DR 的视觉锚点,不再是中文论点。
 
 ### 英文上下文 (`.tldr-context`) 写作原则
 

@@ -68,18 +68,33 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 - 不粉饰、不意译、不漏内容
 - 不编造任何 URL / 头像 / LinkedIn
 
+## ⚠️ 抗压缩:transcript 逐字全量做法(podcast 模式默认,别偷懒)
+
+Ken 要的是**逐句 verbatim 全量**,不是"挑代表性句子的精选"。这是**反复出错**的点:面对 YouTube 那种无标点、滚动重复的脏字幕,容易默默做成"好读摘要",把 8000+ 词压成一半就交。**翻译三步法(step 5)只保证"给它的英文翻得好",不保证"英文没被砍" —— 压缩发生在翻译之前的选句/拼装阶段**,所以光靠 translation-prompt.md 挡不住,必须用下面的分工。
+
+**默认用「子代理碰不到英文」的分工(唯一可靠防压缩的做法):**
+1. **你自己**从 VTT / transcript 重建**逐字英文词流** —— YouTube VTT 是滚动字幕,复用 `scripts/add_timestamps.py` 的 `build_stream()`,别手写解析;保留 `>>` 轮次边界。
+2. **你自己**在句末标点处切 turn(到下限词数后遇 `.?!` 才断),得到**预切好的逐字英文 turn 列表**。
+3. 派翻译子代理时,**只给它预切的逐字英文,让它只产出「中文译文 + 说话人」**;英文由你 verbatim 拼回。子代理**碰不到英文原文 → 没法顺手删 / 并 / 改**。
+4. **绝不在子代理 prompt 里写"清理 / 精简 / 去口水 / 挑重点"** —— 那等于授权它压缩。要逐字就明说"逐字、每句都翻、不删不并"。
+5. 渲染完必过 **step 7 覆盖率硬闸**(见 `checklist.md`):`渲染 en 句数 ÷ 源稿句数 < ~85%` 一律回 step 5 补全。**只查 en=zh 配对 ≠ 自检通过**(配对齐但只覆盖半篇也"全绿")。
+
+> essay / blog 模式本就是完整原文(curl verbatim),不涉及此分工,但同样"不漏内容、句级全量对照"。
+
 ## 输入模式差异
 
 ### Podcast / Interview / 访谈 transcript (英文)
 - 渲染 `.turn / .speaker / .timestamp`
 - Hero kicker:`{Podcast} with {Host} · {YYYY-MM-DD} · 双语整理`
   → 主持人 / 嘉宾从原文提取,**4 个 podcast 模板范例**见 `lessons-learned.md` L1
+- **hero-meta 来源行(必填,见下方"来源行")**:`来源:{平台} · {节目} · {YYYY-MM-DD} · 时长 {H:MM:SS} · 约 {N,NNN} 词 · {N} 章 · 逐字双语对照`
 - 文件名 → 见上方"输出"章节的四种 pattern
 
 ### Blog post / Essay / 单作者长文 (英文)
 - **不**渲染 `.turn / .speaker / .timestamp`,正文用 `.body-block` + `.bilingual` 句级对照
 - Hero kicker:`{Publication} · Essay · {YYYY-MM-DD}`
   例:`Anthropic Blog · Essay · 2025-04-29` / `nav.al · Essay · 2024-04-28` / `Paul Graham · Essay · 2025-XX-XX`
+- **hero-meta 来源行(必填,见下方"来源行")**:`来源:{刊物/作者} · {YYYY-MM-DD} · 约 {N,NNN} 词 · {N} 章 · 全文双语对照`
 - `.chapter-meta` 用关键词概括,不放时间戳
 - 文件名 → 见上方"输出"章节的四种 pattern
 
@@ -218,6 +233,22 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 - `paul-graham` / `naval` / `andrew-chen` 单作者站 → 不重复写作者,直接 `{date}_{source-slug}_{topic}`
 - `sequoia` / `y-combinator` 多主持节目 → 文件名要带 host × guest(若适用)或单 guest
 - `anthropic-blog` / 其他 publication blog → `{date}_{publication}_{author}_{topic}`
+
+### 来源行(hero-meta 底部,必填)
+
+每篇 hero 末尾的 `.hero-meta` **必须**有一行来源 + 元信息 —— Ken 明确要这个,漏了 = 不合格。
+
+| 模式 | 格式 |
+|---|---|
+| Podcast / transcript | `来源:{平台} · {节目}{(第 N 期,可选)} · {YYYY-MM-DD} · 时长 {H:MM:SS} · 约 {N,NNN} 词 · {N} 章 · 逐字双语对照` |
+| Essay / 长文 | `来源:{刊物/作者} · {YYYY-MM-DD} · 约 {N,NNN} 词 · {N} 章 · 全文双语对照` |
+| 中文模式 | `来源:{节目/刊物} · {YYYY-MM-DD} · 约 {N,NNN} 字 · {N} 章 · 中文整理` |
+
+例:`来源:YouTube · Sequoia Capital / Training Data · 2026-XX-XX · 时长 1:10:15 · 约 15,600 词 · 11 章 · 逐字双语对照`
+
+- **词数** = 源稿英文词数(不是渲染后);**章数** = 实际章节数;**时长**从 YouTube/音频 metadata 拿(essay 无时长,省略该字段)。
+- **"逐字双语对照" 是承诺,不是装饰**:只有覆盖率硬闸(≥85%)通过才能写。做成了精选却写"逐字双语对照" = 撒谎 → 回 step 5 补全,别改成"精选"了事。
+- 中文模式写"中文整理"(不写"逐字"),因为中文模式本就是浓缩不是逐句。
 
 ### 输出路径
 
