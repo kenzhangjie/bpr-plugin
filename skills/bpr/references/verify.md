@@ -14,7 +14,7 @@
 - [ ] **逐字全量,不是精选/摘要**:每个发言轮次、每句都做了 `.bilingual` 对照
 - [ ] **比对源稿覆盖率**:`渲染 .turn 数 ÷ 源稿 >> 轮次数` 和 `渲染 en 句数 ÷ 源稿句数`,**任一 < ~85% = 不合格**,回 step 5 补全
 - [ ] ⚠️ **只看 en=zh 配对数相等 ≠ 自检通过**——配对齐但只覆盖半篇也会"全绿",必须额外比源稿
-- [ ] **时间戳已注入**(podcast 模式):跑过 `scripts/add_timestamps.py`,`.timestamp` 数接近 `.turn` 数(超短插话除外),时间单调递增、末值 ≤ 总时长
+- [ ] **时间戳已注入**(podcast 模式):跑过 `scripts/enrich/add_timestamps.py`,`.timestamp` 数接近 `.turn` 数(超短插话除外),时间单调递增、末值 ≤ 总时长
 
 ## 来源行(hero-meta,必填 — 见 SKILL.md "来源行")
 
@@ -24,9 +24,9 @@
 
 ## 翻译
 
-- [ ] **每章每段都跑了三步法**(参 `translation-prompt.md`)——**不跳过、不偷懒、不在意 token 消耗**
+- [ ] **每章每段都跑了三步法**(参 `translate.md`)——**不跳过、不偷懒、不在意 token 消耗**
 - [ ] 每章正文翻译完后扫一遍——没有"被...所..."句式、没有连续 3+ 个"的"字定语、没有"X 这种东西" / "对于 X 来说" / "在...的情况下" 之类的填充结构
-- [ ] **作者语气抓对了**:Naval / PG / Karpathy / Lenny / Anthropic-blog / Schopenhauer 的语气有明显区别(参 `translation-prompt.md` 速查表)
+- [ ] **作者语气抓对了**:Naval / PG / Karpathy / Lenny / Anthropic-blog / Schopenhauer 的语气有明显区别(参 `translate.md` 速查表)
 - [ ] **术语前后一致**:同一概念(agency / leverage / specific knowledge)在全文里要么都保留英文、要么都用同一个中文译法,不能混
 
 ## 主持人 / 嘉宾(podcast 模式)
@@ -85,9 +85,9 @@
 - [ ] 阅读列宽 ≤ 800px(中英文混排最佳宽度)
 - [ ] print stylesheet 有效(Cmd+P 预览)
 - [ ] 没有编造的 URL / 头像 / LinkedIn
-- [ ] **文件名日期 = 内容发布日期**,不是处理日期。提取顺序(参 `rules.md` "发布日期提取"):
-  - YouTube → `metadata.json` 的 `upload_date`(`scripts/fetch_youtube.sh` 已自动跑)
-  - 博客 / essay → 跑 `python3 scripts/extract_metadata.py <URL>`(7 种策略,JSON-LD / OG / wp-uploads / body-text 等)
+- [ ] **文件名日期 = 内容发布日期**,不是处理日期。提取顺序(参 `ingest.md` "发布日期提取"):
+  - YouTube → `metadata.json` 的 `upload_date`(`scripts/fetch/fetch_youtube.sh` 已自动跑)
+  - 博客 / essay → 跑 `python3 scripts/fetch/extract_metadata.py <URL>`(7 种策略,JSON-LD / OG / wp-uploads / body-text 等)
   - Podcast 非 YouTube → WebSearch 找 Spotify / Apple Podcasts / Substack / libsyn 页
   - 拿不到 → 问用户,**绝不静默用今天**;**禁止 WebFetch 兜底**(L4)
 - [ ] Hero kicker 里的日期 = 文件名日期,两处一致

@@ -5,6 +5,18 @@ All notable changes to this plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.5.0 — 2026-07-12
+
+**架构重构(behavior-preserving)**,治四层乱:
+
+- **SKILL.md 269→69 行**:11 步 + 2.5/6.2/6.5 半步 + 满屏 🆕 → 7 阶段线性主线(INGEST → PREP → STRUCTURE → TRANSLATE → RENDER → VERIFY → PUBLISH),海报为可选分支。
+- **references 按阶段拆**:675 行 `rules.md` + `design-system.md` → `ingest / prep-and-modes / translate / render / verify / publish / poster`(+ lessons-learned);`translation-prompt→translate`、`checklist→verify`、`poster-rules→poster` git mv 保历史。
+- **scripts 按职责分组**:`fetch/ enrich/ publish/ poster/`,全局路径更新;清除 7 处 stale 绝对路径(旧 `bpr-skill/` base、`<ver>` cache 路径)+ 修幽灵脚本 `extract_publish_date→extract_metadata`。
+- **翻译硬约束明文化**(`translate.md`):① 四步法 Analyze→Translate→Review→Polish 一步不省;② 英文逐字全覆盖 + **中文 Polish 去口语词**(呃/嗯/you know/I mean),推翻旧"口语感保留"——EN 留 / ZH 去,不对称。这是本次唯一有意的行为改动。
+- **产物约定**(`publish.md`):`Transcript/` 结构固定(`<stem>.html` / `<stem>-poster.png` / `images/<stem>/` / `index.html`)。
+- **修内部损坏**:补回 `extract_images.py`(1.4.3 引用却未 ship)+ `figure.from-source` CSS + lessons L7。
+- **治版本漂移**:以功能超集 cache/1.4.1 为基线对账;此后 source of truth = 本 repo,发布流程固定(改 repo → bump → /plugin 更新 → repoint pin)。
+
 ## v1.4.2 — 2026-06-23
 
 - transcript 模式默认**逐字全量 + 覆盖率硬闸**(渲染轮次/句数 ÷ 源稿 <~85% 判不合格,回 step5 补全;不再只看 en=zh 配对)— 见 L6

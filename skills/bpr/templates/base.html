@@ -238,6 +238,23 @@
     }
     .bilingual a{font-style:normal}
 
+    /* ── source images (essay/blog mode, self-hosted) ─────────────── */
+    /* injected by scripts/extract_images.py → images/<stem>/NN_slug.ext */
+    figure.from-source{margin:32px 0; text-align:center}
+    figure.from-source img{
+      max-width:100%; height:auto; display:block; margin:0 auto;
+      border-radius:6px; border:1px solid var(--rule); background:#fff;
+    }
+    [data-theme="dark"] figure.from-source img{border-color:var(--rule); background:#0d0a07}
+    figure.from-source.banner img{width:100%}
+    figure.from-source.wide img{max-width:100%}
+    figure.from-source.square img{max-width:420px}
+    figure.from-source.portrait img{max-width:340px}
+    figure.from-source figcaption{
+      font-family:var(--sans); font-size:12.5px; color:var(--ink-faint);
+      margin-top:8px; line-height:1.5;
+    }
+
     /* ── turn (podcast mode) ──────────────────────────────────── */
     .turn{margin:28px 0}
     .turn-head{

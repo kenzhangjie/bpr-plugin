@@ -207,8 +207,8 @@ WebFetch 自己加的结构化包装。
 
 ### 关联工具
 
-- **`scripts/extract_metadata.py`** — 抓 URL 的发布日期 + 标题 + 作者,内部已经走 curl,直接调即可
-- **`scripts/fetch_youtube.sh`** — YouTube 走 yt-dlp,跟 curl 是平行路径,各管一摊
+- **`scripts/fetch/extract_metadata.py`** — 抓 URL 的发布日期 + 标题 + 作者,内部已经走 curl,直接调即可
+- **`scripts/fetch/fetch_youtube.sh`** — YouTube 走 yt-dlp,跟 curl 是平行路径,各管一摊
 
 ---
 
@@ -276,5 +276,25 @@ macOS 默认 APFS 文件系统**大小写不敏感但保留(case-insensitive but
 ### 硬规则
 1. **transcript 模式默认就出逐字全量**,不许"精选/摘要"。每个发言轮次、每句都要 `.bilingual` 对照(口语词酌情保留,但不省略信息)。
 2. **step 7 覆盖率硬闸**:生成后比对源稿——`渲染的 .turn 数 / 源稿 >> 轮次数` 和 `渲染 en 句数 / 源稿句数` **任一 < ~85% = 不合格**,必须回 step 5 补全。**只看 en=zh 配对不算自检通过。**
-3. **时间戳用 `scripts/add_timestamps.py`,别手写 VTT 解析**:它做了滚动重建(只取每条 cue 新增尾词)+ 裸首词。podcast 模式 **step 6.5 默认跑**,不用等用户要求。超短插话(<4 个有辨识度的词)匹配不到就留空,不硬塞。
+3. **时间戳用 `scripts/enrich/add_timestamps.py`,别手写 VTT 解析**:它做了滚动重建(只取每条 cue 新增尾词)+ 裸首词。podcast 模式 **step 6.5 默认跑**,不用等用户要求。超短插话(<4 个有辨识度的词)匹配不到就留空,不硬塞。
 4. **根因共性**:YouTube 上传/自动字幕 = 脏 + 滚动 + 有逐词时间但无干净句子/说话人结构。做逐字+时间戳本就是苦活,必须一次做满,别等用户两轮纠错。
+
+---
+
+## L7 · essay/blog 正文图被漏掉(2026-07-10, Lenny "tech workers 2026")
+
+### 症状
+跑 Lenny's Newsletter 一篇**数据调查报告**,做出的双语 reader **一张图都没有** —— 而原文 16 张调查图表本身就是核心内容。用户当场指出"图片没发布"。第一次补救时又走了**热链 substackcdn**,与仓库既有的自托管规范不一致。
+
+### 根因
+1. 早期抓正文只提取 `<h*>/<p>/<li>/<blockquote>` 文本块,**完全没处理 `<img>/<figure>`**;skill 的 `templates/base.html` 也**没有 figure CSS**,所以即便抓了也无处渲染。而仓库里**过去的产物早已有自托管规范**(`images/<stem>/NN_slug.ext` + `<figure class="from-source banner|portrait|square|wide">` + 配套 CSS),只是从没固化进 skill。
+2. Substack 页面正文**重复出现两份**:第一份纯文本无图,第二份才带图(`<a class="image-link" href="全分辨率URL">`)。只扫第一份 → 0 图。
+
+### 硬规则
+1. **essay/blog 模式默认跑 step 6.2 `extract_images.py`**,把正文图**下载自托管**到 `images/<stem>/`,按锚点注入 `<figure class="from-source ...">`。**podcast 模式跳过**(基本无内嵌图)。
+2. **一律自托管,不热链**:热链源站 CDN 会因签名/防盗链失效,且破坏仓库一致性。下载失败**重试2次→跳过并进报告**,不回退热链。
+3. **去噪**:只抓正文容器内的图;下载后 Pillow 读尺寸,**长宽任一 < 100px**(icon/头像)丢弃;URL/alt 命中 `avatar|icon|logo|profile|button|badge|emoji|spacer` 丢弃;报告里列出被跳过的图。
+4. **变体按宽高比**:ratio≥1.8 banner / <0.8 portrait / 否则 短边<500 square 否则 wide。正文开头之前的大图当 `01_hero`(banner)。
+5. **幂等**:`images/<stem>/.manifest.json` 记 `id→file`,re-run 复用不重下;`重抓图 / --refresh` 强制全重下。
+6. **step 7 覆盖率闸门加一条图片项**:`成功下载 / 正文候选图 < ~90%` → 报告显式警告,别默默交缺图版本。
+7. **Substack 类页面正文常重复两份**:抓图要扫全区域并**按图片 id 去重**(`extract_images.py` 已做),别只取第一份。
