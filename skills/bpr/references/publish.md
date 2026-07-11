@@ -28,7 +28,7 @@ Transcript/(= bpr.ken.solar 部署根)固定结构:
 
 ## landing index 重建
 
-新 reader 写完后,用 `scripts/build_index.py` 重建 landing `index.html`(扫描 Transcript 目录下所有 `<stem>.html`,生成卡片列表)。
+新 reader 写完后,用 `scripts/publish/build_index.py` 重建 landing `index.html`(扫描 Transcript 目录下所有 `<stem>.html`,生成卡片列表)。
 
 > ⚠️ **INDEX.html 大小写坑(L5)**:Transcript 目录若有遗留的大写 `INDEX.html`,macOS 大小写不敏感 FS 会让 `open("index.html","w")` 匹配到它、只改内容不改名,而 Vercel 路由大小写敏感,只认小写 `index.html` 当 root → `/` 返回 404。
 > 跑 build_index 之前先清:

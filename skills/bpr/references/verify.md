@@ -14,7 +14,7 @@
 - [ ] **逐字全量,不是精选/摘要**:每个发言轮次、每句都做了 `.bilingual` 对照
 - [ ] **比对源稿覆盖率**:`渲染 .turn 数 ÷ 源稿 >> 轮次数` 和 `渲染 en 句数 ÷ 源稿句数`,**任一 < ~85% = 不合格**,回 step 5 补全
 - [ ] ⚠️ **只看 en=zh 配对数相等 ≠ 自检通过**——配对齐但只覆盖半篇也会"全绿",必须额外比源稿
-- [ ] **时间戳已注入**(podcast 模式):跑过 `scripts/add_timestamps.py`,`.timestamp` 数接近 `.turn` 数(超短插话除外),时间单调递增、末值 ≤ 总时长
+- [ ] **时间戳已注入**(podcast 模式):跑过 `scripts/enrich/add_timestamps.py`,`.timestamp` 数接近 `.turn` 数(超短插话除外),时间单调递增、末值 ≤ 总时长
 
 ## 来源行(hero-meta,必填 — 见 SKILL.md "来源行")
 
@@ -86,8 +86,8 @@
 - [ ] print stylesheet 有效(Cmd+P 预览)
 - [ ] 没有编造的 URL / 头像 / LinkedIn
 - [ ] **文件名日期 = 内容发布日期**,不是处理日期。提取顺序(参 `ingest.md` "发布日期提取"):
-  - YouTube → `metadata.json` 的 `upload_date`(`scripts/fetch_youtube.sh` 已自动跑)
-  - 博客 / essay → 跑 `python3 scripts/extract_metadata.py <URL>`(7 种策略,JSON-LD / OG / wp-uploads / body-text 等)
+  - YouTube → `metadata.json` 的 `upload_date`(`scripts/fetch/fetch_youtube.sh` 已自动跑)
+  - 博客 / essay → 跑 `python3 scripts/fetch/extract_metadata.py <URL>`(7 种策略,JSON-LD / OG / wp-uploads / body-text 等)
   - Podcast 非 YouTube → WebSearch 找 Spotify / Apple Podcasts / Substack / libsyn 页
   - 拿不到 → 问用户,**绝不静默用今天**;**禁止 WebFetch 兜底**(L4)
 - [ ] Hero kicker 里的日期 = 文件名日期,两处一致

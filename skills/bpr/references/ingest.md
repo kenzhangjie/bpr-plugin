@@ -56,8 +56,8 @@ curl -s -L \
 
 | 优先级 | 来源 | 说明 |
 |---|---|---|
-| 1 | **`scripts/extract_metadata.py <URL>`**(博客 / essay)| 自动跑 7 种策略:JSON-LD → OG meta → 通用 meta → HTML5 `<time>` → URL `/YYYY/MM/DD/` → WordPress `wp-uploads/YYYY/MM/` → 正文开头 "Month YYYY" |
-| 2 | **`scripts/fetch_youtube.sh` 产出的 metadata.json**(YouTube)| 字段 `upload_date`(YYYYMMDD)→ 转 `YYYY-MM-DD` |
+| 1 | **`scripts/fetch/extract_metadata.py <URL>`**(博客 / essay)| 自动跑 7 种策略:JSON-LD → OG meta → 通用 meta → HTML5 `<time>` → URL `/YYYY/MM/DD/` → WordPress `wp-uploads/YYYY/MM/` → 正文开头 "Month YYYY" |
+| 2 | **`scripts/fetch/fetch_youtube.sh` 产出的 metadata.json**(YouTube)| 字段 `upload_date`(YYYYMMDD)→ 转 `YYYY-MM-DD` |
 | 3 | **Episode 平台页**(Spotify / Apple / Substack)| 1 + 2 都没拿到 → 看用户能不能给 episode 页面 URL,再走 1 |
 | 4 | **WebSearch**(罕见)| 用作者名 + 标题搜,看官方 podcast feed / Wayback / Goodreads / 媒体报道里的发布时间 |
 | 5 | **问用户** | 前 4 步全空才走这一步,**绝不静默用今天** |
@@ -65,7 +65,7 @@ curl -s -L \
 ### 用法
 
 ```bash
-python3 ~/.claude/skills/bpr-skill/scripts/extract_metadata.py "<URL>"
+python3 ~/.claude/skills/bpr-skill/scripts/fetch/extract_metadata.py "<URL>"
 ```
 
 输出 JSON,关心的字段:
@@ -82,7 +82,7 @@ python3 ~/.claude/skills/bpr-skill/scripts/extract_metadata.py "<URL>"
 
 ### YouTube 一站式流程
 
-bpr 有 `scripts/fetch_youtube.sh`,用 yt-dlp 拉字幕(uploaded 优先 / auto-subs 兜底),全程**不需要 whisper / ffmpeg**。
+bpr 有 `scripts/fetch/fetch_youtube.sh`,用 yt-dlp 拉字幕(uploaded 优先 / auto-subs 兜底),全程**不需要 whisper / ffmpeg**。
 
 **Step A · 检查 yt-dlp**
 
@@ -102,7 +102,7 @@ pipx install yt-dlp
 
 ```bash
 WORKDIR=$(mktemp -d /tmp/bpr-yt-XXXX)
-~/.claude/skills/bpr-skill/scripts/fetch_youtube.sh "<URL>" "$WORKDIR"
+~/.claude/skills/bpr-skill/scripts/fetch/fetch_youtube.sh "<URL>" "$WORKDIR"
 ```
 
 成功后 `$WORKDIR/` 下有:
@@ -198,7 +198,7 @@ vc:note:read                        # 会议纪要(妙记沿用同一权限)
 
 ```bash
 WORKDIR=$(mktemp -d /tmp/bpr-xyz-XXXX)
-~/.claude/plugins/cache/bpr-marketplace/bpr/<ver>/skills/bpr/scripts/fetch_xiaoyuzhou.sh "<URL>" "$WORKDIR"
+~/.claude/plugins/cache/bpr-marketplace/bpr/<ver>/skills/bpr/scripts/fetch/fetch_xiaoyuzhou.sh "<URL>" "$WORKDIR"
 ```
 
 成功后 `$WORKDIR/` 下有:
@@ -211,7 +211,7 @@ WORKDIR=$(mktemp -d /tmp/bpr-xyz-XXXX)
 
 ```bash
 WORKDIR=$(mktemp -d /tmp/bpr-bili-XXXX)
-~/.claude/plugins/cache/bpr-marketplace/bpr/<ver>/skills/bpr/scripts/fetch_bilibili.sh "<URL>" "$WORKDIR"
+~/.claude/plugins/cache/bpr-marketplace/bpr/<ver>/skills/bpr/scripts/fetch/fetch_bilibili.sh "<URL>" "$WORKDIR"
 ```
 
 脚本逻辑:

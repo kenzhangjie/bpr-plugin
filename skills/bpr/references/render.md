@@ -118,12 +118,12 @@ CSS 已经写在 `templates/base.html`(`.bilingual` / `.bilingual .en` / `.bilin
 
 ## 正文图自托管 (essay/blog 模式, step 6.2)
 
-**目标**:把源站正文配图**下载到本地**跟 HTML 一起部署,不热链。规范早已存在于仓库(`images/<stem>/` + `<figure class="from-source ...">`),现由 `scripts/extract_images.py` 自动化。
+**目标**:把源站正文配图**下载到本地**跟 HTML 一起部署,不热链。规范早已存在于仓库(`images/<stem>/` + `<figure class="from-source ...">`),现由 `scripts/enrich/extract_images.py` 自动化。
 
 **流程**:
 1. essay/blog 模式,curl 到 raw HTML + 切好 article blocks(JSON,和渲染用的同一份)之后,跑:
    ```bash
-   python3 scripts/extract_images.py \
+   python3 scripts/enrich/extract_images.py \
      --html <raw.html> --blocks <article.json> \
      --stem <文件名去掉.html> \
      --transcript-dir "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript"

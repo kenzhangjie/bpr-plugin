@@ -207,8 +207,8 @@ WebFetch 自己加的结构化包装。
 
 ### 关联工具
 
-- **`scripts/extract_metadata.py`** — 抓 URL 的发布日期 + 标题 + 作者,内部已经走 curl,直接调即可
-- **`scripts/fetch_youtube.sh`** — YouTube 走 yt-dlp,跟 curl 是平行路径,各管一摊
+- **`scripts/fetch/extract_metadata.py`** — 抓 URL 的发布日期 + 标题 + 作者,内部已经走 curl,直接调即可
+- **`scripts/fetch/fetch_youtube.sh`** — YouTube 走 yt-dlp,跟 curl 是平行路径,各管一摊
 
 ---
 
@@ -276,7 +276,7 @@ macOS 默认 APFS 文件系统**大小写不敏感但保留(case-insensitive but
 ### 硬规则
 1. **transcript 模式默认就出逐字全量**,不许"精选/摘要"。每个发言轮次、每句都要 `.bilingual` 对照(口语词酌情保留,但不省略信息)。
 2. **step 7 覆盖率硬闸**:生成后比对源稿——`渲染的 .turn 数 / 源稿 >> 轮次数` 和 `渲染 en 句数 / 源稿句数` **任一 < ~85% = 不合格**,必须回 step 5 补全。**只看 en=zh 配对不算自检通过。**
-3. **时间戳用 `scripts/add_timestamps.py`,别手写 VTT 解析**:它做了滚动重建(只取每条 cue 新增尾词)+ 裸首词。podcast 模式 **step 6.5 默认跑**,不用等用户要求。超短插话(<4 个有辨识度的词)匹配不到就留空,不硬塞。
+3. **时间戳用 `scripts/enrich/add_timestamps.py`,别手写 VTT 解析**:它做了滚动重建(只取每条 cue 新增尾词)+ 裸首词。podcast 模式 **step 6.5 默认跑**,不用等用户要求。超短插话(<4 个有辨识度的词)匹配不到就留空,不硬塞。
 4. **根因共性**:YouTube 上传/自动字幕 = 脏 + 滚动 + 有逐词时间但无干净句子/说话人结构。做逐字+时间戳本就是苦活,必须一次做满,别等用户两轮纠错。
 
 ---
