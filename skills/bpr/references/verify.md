@@ -99,4 +99,4 @@
 - [ ] 主要分隔符是 `_`,词内 / 多词组合用 `-`(`anton-osika_lovable-200m-arr` 而不是 `anton-osika-lovable-200m-arr`)
 - [ ] 全小写,无空格 / 中文 / 大写
 - [ ] 总长度 ≤ 80 字符,目标 50-70
-- [ ] 输出到 `/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/`
+- [ ] 输出到 `~/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/`

@@ -12,7 +12,7 @@ extract_images.py — BPR essay/blog 模式抓图 + 自托管
     --html /tmp/raw.html \
     --blocks /tmp/article.json \
     --stem 2026-07-07_publication_author_topic \
-    --transcript-dir "/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript" \
+    --transcript-dir "~/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript" \
     [--content-class available-content] [--refresh]
 
 stdout JSON:

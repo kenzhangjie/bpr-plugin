@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build /Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/{index,posters}.html from BPR HTML files.
+"""Build ~/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/{index,posters}.html from BPR HTML files.
 
 This is a personal publishing tool for ken.solar — separate from the BPR plugin
 itself (which only generates per-content HTML/poster).
@@ -17,13 +17,14 @@ Idempotent. Safe to rerun anytime.
 """
 from __future__ import annotations
 
+import os
 import re
 import sys
 from datetime import date as _date
 from html import escape
 from pathlib import Path
 
-TRANSCRIPT_DIR = Path("/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript")
+TRANSCRIPT_DIR = Path(os.environ.get("BPR_TRANSCRIPT_DIR", "~/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript")).expanduser()
 INDEX_PATH = TRANSCRIPT_DIR / "index.html"
 POSTERS_PATH = TRANSCRIPT_DIR / "posters.html"
 BASE_URL = "https://bpr.ken.solar"

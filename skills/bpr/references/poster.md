@@ -127,7 +127,7 @@ cp templates/poster-template.html \
 ```bash
 /usr/bin/python3 scripts/poster/crop_and_share.py \
   /tmp/<stem>-poster-raw.png \
-  "/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/<stem>-poster.png"
+  "~/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/<stem>-poster.png"
 ```
 
 > 注:用 `/usr/bin/python3` 而不是 `python3`,因为 brew 的 python3 可能是损坏版本(已踩坑)。系统 3.9 自带 Pillow 走得通。

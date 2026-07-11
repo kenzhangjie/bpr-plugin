@@ -236,8 +236,8 @@ macOS 默认 APFS 文件系统**大小写不敏感但保留(case-insensitive but
 
 1. **build_index.py 跑之前**先清掉任何遗留的大写 `INDEX.html`:
    ```bash
-   [ -f "/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/INDEX.html" ] && \
-     rm "/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/INDEX.html"
+   [ -f "~/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/INDEX.html" ] && \
+     rm "~/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/INDEX.html"
    ```
 
 2. **写文件用"先删后写"模式**,而不是直接 `write_text`:
