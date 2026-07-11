@@ -79,7 +79,8 @@ CSS 已经写在 `templates/base.html`(`.bilingual` / `.bilingual .en` / `.bilin
 
 ### 对照内容要求
 
-- **保留原文 verbatim**,不省略口头语(you know / I mean / like 等可酌情保留以体现语气)
+- **英文行保留 verbatim**,含口语水词(you know / I mean / like / uh / um)——逐字不删,方便学真实口语
+- **中文行按 `translate.md` 硬约束 2 处理**:Polish 步去掉无意义口语水词(呃/嗯/you know/I mean/the thing is),读起来干净书面;保留有语义的迟疑/强调。即 **EN 留 / ZH 去**,不对称(推翻旧"口语感保留 uh/um→呃/嗯")。以 `translate.md` 为权威
 - 中文翻译以"信达雅"中的"达"为先——准确传递意思 > 字面对照
 - 专有名词、公司名、人名保持英文原文(Stripe / DoorDash / Keith Rabois)
 - 数字、单位保留原文($10M 不翻成"一千万美元")

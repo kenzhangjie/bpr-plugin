@@ -98,7 +98,7 @@
 ### 1. 复制模板到 /tmp
 
 ```bash
-cp /Users/ken/.claude/skills/bpr-skill/templates/poster-template.html \
+cp templates/poster-template.html \
    "/tmp/<stem>-poster.html"
 ```
 
@@ -125,7 +125,7 @@ cp /Users/ken/.claude/skills/bpr-skill/templates/poster-template.html \
 ### 4. Crop 到 Transcript 目录(直接最终命名,无 -hidpi 后缀)
 
 ```bash
-/usr/bin/python3 /Users/ken/.claude/skills/bpr-skill/scripts/poster/crop_and_share.py \
+/usr/bin/python3 scripts/poster/crop_and_share.py \
   /tmp/<stem>-poster-raw.png \
   "/Users/ken/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/<stem>-poster.png"
 ```

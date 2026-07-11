@@ -65,7 +65,7 @@ curl -s -L \
 ### 用法
 
 ```bash
-python3 ~/.claude/skills/bpr-skill/scripts/fetch/extract_metadata.py "<URL>"
+python3 scripts/fetch/extract_metadata.py "<URL>"
 ```
 
 输出 JSON,关心的字段:
@@ -102,7 +102,7 @@ pipx install yt-dlp
 
 ```bash
 WORKDIR=$(mktemp -d /tmp/bpr-yt-XXXX)
-~/.claude/skills/bpr-skill/scripts/fetch/fetch_youtube.sh "<URL>" "$WORKDIR"
+scripts/fetch/fetch_youtube.sh "<URL>" "$WORKDIR"
 ```
 
 成功后 `$WORKDIR/` 下有:
@@ -198,7 +198,7 @@ vc:note:read                        # 会议纪要(妙记沿用同一权限)
 
 ```bash
 WORKDIR=$(mktemp -d /tmp/bpr-xyz-XXXX)
-~/.claude/plugins/cache/bpr-marketplace/bpr/<ver>/skills/bpr/scripts/fetch/fetch_xiaoyuzhou.sh "<URL>" "$WORKDIR"
+scripts/fetch/fetch_xiaoyuzhou.sh "<URL>" "$WORKDIR"
 ```
 
 成功后 `$WORKDIR/` 下有:
@@ -211,7 +211,7 @@ WORKDIR=$(mktemp -d /tmp/bpr-xyz-XXXX)
 
 ```bash
 WORKDIR=$(mktemp -d /tmp/bpr-bili-XXXX)
-~/.claude/plugins/cache/bpr-marketplace/bpr/<ver>/skills/bpr/scripts/fetch/fetch_bilibili.sh "<URL>" "$WORKDIR"
+scripts/fetch/fetch_bilibili.sh "<URL>" "$WORKDIR"
 ```
 
 脚本逻辑:
@@ -325,7 +325,7 @@ cat "$WORKDIR/metadata.json" | python3 -c "import json,sys;d=json.load(sys.stdin
 #### P2a · 跑脚本(优先,~70% 场景秒级解决)
 
 ```bash
-python3 ~/.claude/skills/bpr-skill/scripts/extract_publish_date.py "<URL>"
+python3 scripts/fetch/extract_metadata.py "<URL>"
 ```
 
 返回:

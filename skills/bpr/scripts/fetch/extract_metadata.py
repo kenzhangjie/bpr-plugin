@@ -23,7 +23,7 @@ Date priority (highest first):
   6. null  (caller should ask user)
 
 YouTube URLs:
-  Returned with date=null and a note pointing to scripts/fetch_youtube.sh.
+  Returned with date=null and a note pointing to scripts/fetch/fetch_youtube.sh.
   Don't try to scrape YouTube here — yt-dlp's metadata.json is the real source.
 
 No external deps — only stdlib (urllib + re + json).
@@ -400,7 +400,7 @@ def main():
             "source_slug": slug,
             "canonical": url,
             "source": "youtube_skip",
-            "note": "Use scripts/fetch_youtube.sh; date comes from metadata.json upload_date.",
+            "note": "Use scripts/fetch/fetch_youtube.sh; date comes from metadata.json upload_date.",
         }, ensure_ascii=False, indent=2))
         return
 
