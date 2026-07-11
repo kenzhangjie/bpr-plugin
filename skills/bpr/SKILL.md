@@ -21,8 +21,9 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 | **2.5** | **🆕 语言检测**:统计 CJK 字符占比。**≥ 60% → 切到中文模式**(跳过 step 5 翻译,改走 TL;DR + 非共识 + 章节回顾结构);**< 60% → 英文双语模式**(继续原流程)| `references/rules.md` "中文模式 (Chinese-Only Mode)" |
 | 3 | 章节切分(按下方"自适应"表) | — |
 | 4 | 提炼 TL;DR(按下方"自适应"表 + 描述性 h2)+(**中文模式**)非共识 takes | `references/rules.md` 看每条 TL;DR 的 4 元素格式 + 中文模式的 2 元素格式 |
-| 5 | **逐句翻译**(三步法,每章每段都跑,不跳过)— **仅英文双语模式跑此步**,中文模式跳过 | **`references/translation-prompt.md`** 必读 |
+| 5 | **逐句翻译**(**四步法**:每篇先 Analyze 定术语表,每章 Translate 一轮 → 独立 Review+Polish 一轮,不跳过)— **仅英文双语模式跑此步**,中文模式跳过 | **`references/translation-prompt.md`** 必读 |
 | 6 | 生成 HTML | **`templates/base.html`** copy 骨架 + `references/rules.md` 看双语对照 / inline link 规范 / 中文模式版型 |
+| 6.2 | **🆕 抓正文图并自托管(essay/blog 模式默认跑,podcast 跳过)**:`python3 scripts/extract_images.py --html <raw.html> --blocks <article.json> --stem <文件名去.html> --transcript-dir "<Transcript 目录>"`。脚本下载正文图到 `images/<stem>/NN_slug.ext`、Pillow 定 `figure.from-source` 变体、写 `.manifest.json`,并把「锚点 article_index → 本地图」以 JSON 返回;主流程据此在对应正文块后注入 `<figure class="from-source VARIANT"><img src="images/<stem>/..."></figure>`(hero 图放章节顶/第一章开头)。**不热链、失败跳过并进 step 7 报告**;详见 `references/rules.md` "正文图自托管" + L7 | `scripts/extract_images.py`(见 L7) |
 | 6.5 | **🆕 时间戳(podcast 模式默认跑,不用等用户提)**:`python3 scripts/add_timestamps.py <transcript.*.vtt> <reader.html>`,给每个 `.turn` 注入 `<span class="timestamp">`。VTT 是滚动字幕,脚本已做滚动重建,别手写解析 | `scripts/add_timestamps.py`(见 L6) |
 | 7 | 质量自检 — **含覆盖率硬闸(见 L6),不达标必须回 step 5 补全,不是只看 en=zh 配对** | `references/checklist.md` |
 | 8 | **(可选)海报阶段**:仅当命令以 `/bpr all` 开头时跑 | **`references/poster-rules.md`** + `templates/poster-template.html` + `scripts/crop_and_share.py` |
@@ -59,8 +60,8 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 
 ## 翻译规则(简版,完整规则见 `translation-prompt.md`)
 
-- **每章每段都跑三步法**(Translate → Reflect → Improve),不跳过、不偷懒、不在意 token 消耗
-- 每章只输出 Step 3 改进版,Step 1/2 是内部自检
+- **四步法(2026-07 起,Ken 拍板"以后都四步")**:每篇先 **Analyze**(定全局术语表 + 作者/嘉宾语气,分派时塞进每个子代理);每章 **Translate**(第 1 轮子代理出直译草稿)→ **独立 Review+Polish**(第 2 个全新 context 的子代理:先只校准确/术语,再只修流畅/风格)。不跳过、不偷懒、不在意 token 消耗
+- Translate/Review/Polish 拆两轮的目的:准确性和流畅性分开优化,且第 2 轮不被自己草稿锚定,挑得更狠(完整规则见 `translation-prompt.md`)
 - 术语保留原文:PM / IC / PMF / AI-first / builder / ROI / CAC / LTV / ARR / agent / harness / agentic / RAG 等
 - 口语感保留:uh / um → 呃 / 嗯
 - 引用人名:英文 + 中文并存(第一次出现;之后只用英文)
@@ -75,8 +76,11 @@ Ken 要的是**逐句 verbatim 全量**,不是"挑代表性句子的精选"。�
 **默认用「子代理碰不到英文」的分工(唯一可靠防压缩的做法):**
 1. **你自己**从 VTT / transcript 重建**逐字英文词流** —— YouTube VTT 是滚动字幕,复用 `scripts/add_timestamps.py` 的 `build_stream()`,别手写解析;保留 `>>` 轮次边界。
 2. **你自己**在句末标点处切 turn(到下限词数后遇 `.?!` 才断),得到**预切好的逐字英文 turn 列表**。
-3. 派翻译子代理时,**只给它预切的逐字英文,让它只产出「中文译文 + 说话人」**;英文由你 verbatim 拼回。子代理**碰不到英文原文 → 没法顺手删 / 并 / 改**。
-4. **绝不在子代理 prompt 里写"清理 / 精简 / 去口水 / 挑重点"** —— 那等于授权它压缩。要逐字就明说"逐字、每句都翻、不删不并"。
+3. **四步法分两轮子代理(2026-07 默认)**:
+   - **第 1 轮 Translate**:只给预切的逐字英文 + 全局术语表(Step 0 Analyze 定的),让它只产出「中文草稿 + 说话人」,zh 句数 == 英文句数。
+   - **第 2 轮 Review+Polish**(**全新 context 的第二个子代理**):给它逐字英文 + 第 1 轮中文草稿 + 术语表 + 语气 brief,让它先只校准确/术语、再只修流畅/风格,只回终稿中文(zh 句数不变)。全新 context = 不被自己草稿锚定,挑得更狠。
+   - 两轮都**只产中文**,英文始终由你 verbatim 拼回。子代理**碰不到英文原文的持有权 → 没法顺手删 / 并 / 改**(抗压缩铁律不变)。
+4. **绝不在任何一轮 prompt 里写"清理 / 精简 / 去口水 / 挑重点"** —— 那等于授权它压缩。要逐字就明说"逐字、每句都翻、不删不并";Polish 只改"怎么说"不改"说了什么"。
 5. 渲染完必过 **step 7 覆盖率硬闸**(见 `checklist.md`):`渲染 en 句数 ÷ 源稿句数 < ~85%` 一律回 step 5 补全。**只查 en=zh 配对 ≠ 自检通过**(配对齐但只覆盖半篇也"全绿")。
 
 > essay / blog 模式本就是完整原文(curl verbatim),不涉及此分工,但同样"不漏内容、句级全量对照"。
@@ -92,6 +96,7 @@ Ken 要的是**逐句 verbatim 全量**,不是"挑代表性句子的精选"。�
 
 ### Blog post / Essay / 单作者长文 (英文)
 - **不**渲染 `.turn / .speaker / .timestamp`,正文用 `.body-block` + `.bilingual` 句级对照
+- **正文图默认自托管(step 6.2)**:跑 `extract_images.py` 抓源站配图下载到本地 `images/<stem>/`,按锚点注入 `<figure class="from-source ...">`;**不热链**。数据报告/调查类(图表即内容)尤其别漏图 — 见 L7
 - Hero kicker:`{Publication} · Essay · {YYYY-MM-DD}`
   例:`Anthropic Blog · Essay · 2025-04-29` / `nav.al · Essay · 2024-04-28` / `Paul Graham · Essay · 2025-XX-XX`
 - **hero-meta 来源行(必填,见下方"来源行")**:`来源:{刊物/作者} · {YYYY-MM-DD} · 约 {N,NNN} 词 · {N} 章 · 全文双语对照`
@@ -100,9 +105,9 @@ Ken 要的是**逐句 verbatim 全量**,不是"挑代表性句子的精选"。�
 
 ### 🆕 中文模式 (Chinese-Only Mode)
 - 触发:step 2.5 检测到 CJK ≥ 60%(完全自动)
-- **不**跑翻译三步法,正文是浓缩中文摘要,不是逐句对照
+- **不**跑翻译四步法(中文无需翻译);但正文是**逐字全文**(说话人 + 时间戳 + 逐句原文),**不是浓缩摘要**(Ken 2026-07-11 拍板:中文模式也要逐字全量,别只概括)
 - Hero kicker:`{Podcast} with {Host} · {YYYY-MM-DD} · 中文整理`(关键词是"中文整理",跟英文版的"双语整理"区分)
-- 结构:Hero → TL;DR(中文 2 元素)→ 🔥 **非共识 takes**(中文 verbatim 引用 + 为什么非共识)→ 章节回顾(200-400 字/章浓缩)→ Footer
+- 结构:Hero → TL;DR(中文 2 元素,速读)→ 🔥 **非共识 takes**(中文 verbatim 引用 + 为什么非共识)→ **章节正文逐字全文**(`.turn` + `.speaker` + `.timestamp`,中文单语,把 ASR 逐句原文按说话人合并成 turn 全量渲染,覆盖率同英文的 ≥85% 硬闸)→ Footer。TL;DR + 非共识 = 顶部速读,正文 = 逐字底档,两者都要
 - **非共识 section 是中文模式的灵魂**——做不好整篇就是简陋摘要器,严格按 `rules.md` "非共识 section 写作原则" 写
 - 完整规范、CSS 类名(`.contrarian` / `.contrarian-quote` / `.contrarian-why`)、章节模板见 `references/rules.md` "中文模式 (Chinese-Only Mode)" section
 
@@ -242,13 +247,13 @@ Ken 要的是**逐句 verbatim 全量**,不是"挑代表性句子的精选"。�
 |---|---|
 | Podcast / transcript | `来源:{平台} · {节目}{(第 N 期,可选)} · {YYYY-MM-DD} · 时长 {H:MM:SS} · 约 {N,NNN} 词 · {N} 章 · 逐字双语对照` |
 | Essay / 长文 | `来源:{刊物/作者} · {YYYY-MM-DD} · 约 {N,NNN} 词 · {N} 章 · 全文双语对照` |
-| 中文模式 | `来源:{节目/刊物} · {YYYY-MM-DD} · 约 {N,NNN} 字 · {N} 章 · 中文整理` |
+| 中文模式 | `来源:{节目/刊物} · {YYYY-MM-DD} · 约 {N,NNN} 字 · {N} 章 · 中文逐字全文` |
 
 例:`来源:YouTube · Sequoia Capital / Training Data · 2026-XX-XX · 时长 1:10:15 · 约 15,600 词 · 11 章 · 逐字双语对照`
 
 - **词数** = 源稿英文词数(不是渲染后);**章数** = 实际章节数;**时长**从 YouTube/音频 metadata 拿(essay 无时长,省略该字段)。
 - **"逐字双语对照" 是承诺,不是装饰**:只有覆盖率硬闸(≥85%)通过才能写。做成了精选却写"逐字双语对照" = 撒谎 → 回 step 5 补全,别改成"精选"了事。
-- 中文模式写"中文整理"(不写"逐字"),因为中文模式本就是浓缩不是逐句。
+- 中文模式写"中文逐字全文"(正文是逐字的,TL;DR/非共识 是顶部速读);覆盖率没过 ≥85% 硬闸不许写"逐字全文"。
 
 ### 输出路径
 

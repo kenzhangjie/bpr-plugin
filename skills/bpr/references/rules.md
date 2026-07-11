@@ -527,12 +527,11 @@ CSS 已经写在 `templates/base.html`(`.bilingual` / `.bilingual .en` / `.bilin
 
 ### 为什么单独一套?
 
-中文 podcast / blog / 访谈不需要翻译,逐句双语对照纯属浪费篇幅。读者真正想从中文内容里拿到的是:
-1. **可扫读的摘要**(TL;DR,5-15 条)
-2. **非共识的判断**(嘉宾说出来的反直觉 / 反主流的洞见)
-3. **章节回顾**(每章 200-400 字浓缩)
+中文 podcast / blog / 访谈不需要翻译(省掉英文双语对照那一半),但**正文仍要逐字全文**。读者想要的是:
+1. **可扫读的速读层**(TL;DR,5-15 条 + 🔥 非共识 takes)—— 放顶部
+2. **逐字全文正文**(说话人 + 时间戳 + 逐句原文,中文单语)—— 放正文,全量不概括
 
-——本质是从"逐字稿"压缩到"读书笔记"。
+——本质是"顶部给速读笔记,正文给逐字底档",**不是**把整集压成摘要。⚠️ Ken 2026-07-11 明确:中文模式正文也要逐字全量,别只概括(跟英文的抗压缩铁律一致)。
 
 ### 语言检测算法
 
@@ -565,10 +564,10 @@ TL;DR · 速读 (5-15 条)
   - 配一个 "为什么非共识" 短解释 (中文,1-2 句)
   - 可选:多数人怎么想(对比锚点)
 ─────────────────
-章节回顾 (8-12 章,可选)
-  - 每章 200-400 字中文摘要(不是 verbatim)
-  - 保留章节级时间戳(如有)
-  - 不再有 .bilingual 双语对照块
+章节正文逐字全文 (8-12 章)
+  - 每章:ASR 逐句原文按说话人合并成 `.turn`(speaker + timestamp + 逐句 `<p class="zh">`)
+  - **逐字全量,不概括**;覆盖率同英文 ≥85% 硬闸
+  - 中文单语,没有 .bilingual(不需要翻译)
 ─────────────────
 Footer(来源 + 元信息)
 ```
@@ -578,11 +577,11 @@ Footer(来源 + 元信息)
 | 维度 | 英文双语模式 | 中文模式 |
 |---|---|---|
 | 翻译三步法 | ✓ 每段都跑 | ✗ 不跑 |
-| `.bilingual` 双语对照块 | ✓ 句级 | ✗ 不渲染 |
-| `.turn-head` speaker / timestamp | 视情况渲染 | 视情况渲染(可保留) |
+| `.bilingual` 双语对照块 | ✓ 句级 | ✗ 不渲染(中文单语) |
+| `.turn-head` speaker / timestamp | 视情况渲染 | ✓ **正文渲染**(逐字 turn) |
 | TL;DR 4 元素结构 | 中文论点 + 英文金句 + 英文上下文 + 中文解释 | **仅 2 元素**:中文论点 + 中文解释 |
 | **非共识 section** | ✗ 不渲染 | ✓ **必须有** |
-| 章节正文 | 逐句双语对照 | 浓缩中文摘要 |
+| 章节正文 | 逐句双语对照 | **逐字全文**(`.turn`,中文单语,不概括) |
 
 ### 非共识 section 写作原则
 
@@ -613,22 +612,28 @@ Footer(来源 + 元信息)
 
 CSS 写在 `templates/base.html` 的"中文模式扩展样式"section。
 
-### 章节回顾(中文模式专属)
+### 章节正文逐字全文(中文模式)
 
-跟英文双语模式的 `.bilingual` 句级对照完全不同——这里是**浓缩摘要**,200-400 字一章。
+**跟英文双语模式的区别只是"没有 .en/翻译那一半"**,结构照样是 podcast `.turn` 逐字:每章把 ASR 逐句原文按说话人合并成 turn,speaker + timestamp + 每句一个 `<p class="zh">`,**全量不概括**。
 
 ```html
-<section class="chapter zh-only" id="chN">
+<section class="chapter" id="chN">
   <div class="ch-num">Chapter 0N</div>
   <h2>章节中文标题</h2>
   <div class="ch-range">15:30 — 28:45 · 关键词概括</div>
-  <div class="ch-summary">
-    <p>本章 200-400 字的中文浓缩,抓住核心论点 + 关键证据 + 嘉宾态度。
-    不是 verbatim,允许编辑取舍。但**不能编造嘉宾没说的话**。</p>
-    <p>(如有金句)<span class="ch-pull">"verbatim 嘉宾原话"</span></p>
+  <div class="turn">
+    <div class="turn-head"><span class="speaker" data-role="host">主持人名</span><span class="timestamp">00:15:30</span></div>
+    <div class="turn-body">
+      <p class="zh">逐句原文 1。</p>
+      <p class="zh">逐句原文 2。</p>
+    </div>
   </div>
+  <!-- 更多 .turn,覆盖全章 -->
 </section>
 ```
+
+> CSS:`.turn-body .zh` 若模板没定义(base.html 的 `.zh` 在 `.bilingual` 里),在 `<style>` 末尾补一条独立样式(见 2026-07-11 张小珺×Freda 那篇的做法:`font-family:var(--serif-zh);border-left:2px solid var(--rule);padding-left:14px`)。
+> **弃用**:旧的 `.ch-summary` 200-400 字浓缩版型已不用(Ken 要逐字);`ch-pull` 也不再需要(金句已在非共识区)。
 
 ### 文件名约定(中文模式)
 
@@ -637,3 +642,33 @@ CSS 写在 `templates/base.html` 的"中文模式扩展样式"section。
 - B 站:`{date}_{uploader}_{topic}.html`
 
 例:`2026-05-13_kechuang-50-ren_zhang-yiming_AI-and-bytedance.html`(科创 50 人:张一鸣谈 AI 与字节)
+
+---
+
+## 正文图自托管 (essay/blog 模式, step 6.2)
+
+**目标**:把源站正文配图**下载到本地**跟 HTML 一起部署,不热链。规范早已存在于仓库(`images/<stem>/` + `<figure class="from-source ...">`),现由 `scripts/extract_images.py` 自动化。
+
+**流程**:
+1. essay/blog 模式,curl 到 raw HTML + 切好 article blocks(JSON,和渲染用的同一份)之后,跑:
+   ```bash
+   python3 scripts/extract_images.py \
+     --html <raw.html> --blocks <article.json> \
+     --stem <文件名去掉.html> \
+     --transcript-dir "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript"
+   # 源站正文容器 class 不是 available-content 时加 --content-class <class>
+   # 源站配图更新、要强制重下:加 --refresh
+   ```
+2. 脚本 stdout 返回 JSON:`{anchors:[[article_index,{file,variant,alt}]...], hero:[...], skipped:[...], coverage:{...}}`。
+3. 渲染时:
+   - `hero[]` 的图放在**第一章正文开头**(或 hero 之后),variant 恒为 banner。
+   - `anchors[]` 每条在**对应 article_index 的正文块之后**注入:
+     ```html
+     <figure class="from-source {variant}"><img loading="lazy" src="{file}" alt="{alt}"></figure>
+     ```
+   - `file` 已是相对路径 `images/<stem>/NN_slug.ext`,直接用。
+4. **step 7 自检**:看 `coverage.ratio`,< ~0.9 在报告里显式警告"N 张图没抓到";`skipped[]` 里的原因(download-failed / too-small)也列给用户。
+
+**规则**(与 L7 同步):自托管不热链;失败跳过不回退;尺寸/关键词去噪;变体按宽高比;`.manifest.json` 幂等;Substack 正文常重复两份,按图 id 去重(脚本已处理)。
+
+**podcast 模式不跑**(YouTube/小宇宙/B站 正文基本无内嵌图)。
