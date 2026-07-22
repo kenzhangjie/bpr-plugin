@@ -227,8 +227,16 @@ scripts/fetch/fetch_bilibili.sh "<URL>" "$WORKDIR"
 # fetch_xiaoyuzhou.sh / fetch_bilibili.sh 已给出音频直链(metadata.json 的 audio_url),
 # 火山可直接吃 URL,省掉重新上传那一步。
 AUDIO_URL=$(python3 -c "import json;print(json.load(open('$WORKDIR/metadata.json'))['audio_url'])")
-python3 ~/.config/volc/volc_asr.py "$AUDIO_URL" "$WORKDIR/transcript.txt"
+# --meta 把本期标题/简介 + ~/.config/volc/glossary.txt 常驻专名表拼成 context 偏置喂给模型,
+# 中英混录的英文品牌名/术语在识别阶段就转对,别再靠事后 correct_table 替换。
+python3 ~/.config/volc/volc_asr.py "$AUDIO_URL" "$WORKDIR/transcript.txt" --meta "$WORKDIR/metadata.json"
 ```
+
+**质量偏置三层(强→弱)**:
+
+1. `corpus.context`(--meta 自动 + glossary.txt):本期元数据(标题/简介) + 常驻专名表,在识别时直接偏置模型,转录准确度最高。
+2. `corpus.boosting_table_name`(--boosting 控制台表):云端管理的特定领域术语表,精度次于上层。
+3. `correct_table.json`(事后替换,兜底):本地硬映射表,仅修正遗漏,不影响上游两层的转录结果。
 
 输出 `transcript.txt` 是 `Speaker N HH:MM:SS.mmm` 格式(与妙记导出一致,下游无需改),
 并自动套用 `~/.config/volc/correct_table.json` 的专名硬映射(Higgsfield / Hockey Stick Growth / Midjourney …)。
