@@ -25,10 +25,13 @@
 - 抓完整 shownote,作为 **CLEAN 阶段的纠错参考**(不是 ASR context)。
 - CLEAN 的 Analyze/Review 消费 shownote + glossary,定向纠专名。
 
+**目标(补充,2026-07-23 二次校正)**
+- **重新纳入火山热词文件**(`corpus.boosting_table_name`):实测 2.0 **接受** boosting_table_name(只有 `corpus.context` 崩),它是唯一直接提"源头字准"、且能覆盖 shownote 未写词的手段。之前误随 context 一起砍,现恢复。内容源 `~/.config/volc/boosting.txt`,火山自学习平台建表,`--boosting`/env `VOLC_ASR_BOOSTING` 传入。
+
 **非目标(实测后砍掉)**
-- ~~ASR `corpus.context` 偏置~~:2.0 直接崩;biasing 移到 CLEAN LLM。
+- ~~ASR `corpus.context` 偏置~~:2.0 直接崩;per-episode biasing 移到 CLEAN LLM。
 - ~~置信度驱动 flagging~~:confidence 全 0,不可行。
-- ~~控制台热词表~~、~~英文独立模型~~:同初版(单轨、YAGNI)。
+- ~~英文独立模型~~:同初版(YAGNI)。
 
 ## 2. 架构 / 数据流
 

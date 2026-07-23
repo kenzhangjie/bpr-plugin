@@ -227,16 +227,17 @@ scripts/fetch/fetch_bilibili.sh "<URL>" "$WORKDIR"
 # fetch_xiaoyuzhou.sh / fetch_bilibili.sh 已给出音频直链(metadata.json 的 audio_url),
 # 火山可直接吃 URL,省掉重新上传那一步。
 AUDIO_URL=$(python3 -c "import json;print(json.load(open('$WORKDIR/metadata.json'))['audio_url'])")
-# 裸跑,不传 context:火山 2.0(默认 volc.seedasr.auc)传 corpus.context 会 55000001 内部错误。
-# 专名纠错交给下游 CLEAN 阶段(用 metadata 的 shownote + glossary.txt 做参考)。
+# 不传 context:火山 2.0(默认 volc.seedasr.auc)传 corpus.context 会 55000001。
+# 可选源头字准:建好火山热词文件后 → export VOLC_ASR_BOOSTING=<热词文件名>(见下第 2 层)。
 python3 ~/.config/volc/volc_asr.py "$AUDIO_URL" "$WORKDIR/transcript.txt"
 ```
 
-**2.0 裸跑 + 纠错分工(2026-07-23 实测定案)**:
+**字准四层(源头→下游,2026-07-23 实测定案)**:
 
-1. **ASR = 火山 2.0 裸跑**(env `VOLC_ASR_RESOURCE`,默认 `volc.seedasr.auc`;出问题设 `volc.bigasr.auc` 回退 1.0)。**不传 context**——2.0 一传 `corpus.context` 就 55000001;2.0 裸跑基础已较强(Anthropic/CoWork/scaling 零偏置即对)。
-2. **专名纠错 = 下游 CLEAN**(`clean.md`):Analyze/Review 读 metadata 的 **shownote + `podcast` 名 + glossary.txt**,把残留专名(Aultimate→Altimeter、小俊→小珺)纠对——shownote 是比 ASR 更可信的独立信源。
-3. `correct_table.json`(事后替换,兜底):本地无歧义硬映射,补前两步遗漏。
+1. **ASR 基座 = 火山 2.0**(env `VOLC_ASR_RESOURCE`,默认 `volc.seedasr.auc`;出问题设 `volc.bigasr.auc` 回退 1.0)。基础较强(Anthropic/CoWork/scaling 零偏置即对)。**绝不传 `corpus.context`**——2.0 会 55000001。
+2. **源头字准 = 热词文件**(可选但推荐;`corpus.boosting_table_name`,2.0 实测可用)。火山**自学习平台 → 热词管理 → 热词文件**建表,把**复现的固定专名**(Claude/Higgsfield/影视飓风…)在识别阶段掰对——这是唯一能直接提源头字准、且能覆盖 shownote 里没写的词的手段。经 `--boosting <名>` 或 env `VOLC_ASR_BOOSTING` 传入;内容源 `~/.config/volc/boosting.txt`(维护它、上传到控制台)。⚠️ 只放易错专名,别加常见词(过度偏置会把普通词硬掰)。
+3. **本期专名 = 下游 CLEAN**(`clean.md`):Analyze/Review 读 **shownote + `podcast` 名 + glossary.txt**,纠本期特有名(Aultimate→Altimeter、小俊→小珺)——shownote 是比 ASR 更可信的独立信源。
+4. `correct_table.json`(事后替换,兜底):本地无歧义硬映射,补前三层遗漏。
 
 输出 `transcript.txt` 是 `Speaker N HH:MM:SS.mmm` 格式(与妙记导出一致,下游无需改),
 并自动套用 `~/.config/volc/correct_table.json` 的专名硬映射(Higgsfield / Hockey Stick Growth / Midjourney …)。
