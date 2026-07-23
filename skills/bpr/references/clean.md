@@ -16,7 +16,7 @@
 - `metadata.json` 的 **title + podcast + shownote**(fetch_xiaoyuzhou.sh 已抓完整 shownote):嘉宾/公司/产品名、OUTLINE 全在里面。
   - shownote **仅小宇宙有**;B站/YouTube 无 `shownote` 字段时跳过它,靠 title + podcast + glossary + 全稿上下文即可(降级,不报错)。
   - ⚠️ **必带 `podcast` 字段**:主持人本名常只在节目名里(如"张小珺Jùn｜商业访谈录"的"珺"),shownote 正文没有——不喂 podcast 名,`小俊/小军` 就纠不对(实测踩过)。
-- `~/.config/volc/glossary.txt`:常驻专名词库。
+- `~/.config/volc/glossary.txt`:常驻专名词库(从多期 shownote 沉淀)。格式为 `专名|热度权重`(如 `张小珺|8`)——**读专名即可,忽略 `|` 后的权重**(权重是给火山热词表用的,对 CLEAN 参考无意义)。
 
 产出 brief:
 1. **领域术语表**:综合 shownote + glossary,列本期专名(标保留英文/固定中文)。AI/科技/投资/growth 优先。
