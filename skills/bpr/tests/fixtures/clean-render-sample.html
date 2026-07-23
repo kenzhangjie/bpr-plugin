@@ -1,0 +1,76 @@
+<!--
+  clean-render-sample.html
+  ───────────────────────────────────────────────────────────────────────
+  Task 5 fixture — 手写小样,验证 CLEAN 阶段渲染约定:
+    1. 书面正文 .turn / .zh
+    2. 可折叠逐字底档 <details class="raw-transcript">
+    3. 存疑标注 <mark class="asr-uncertain">
+  CSS 内联自 templates/base.html,自包含可独立打开。
+  验证方式见 task-5-brief.md Step 4(肉眼检查,需人工)。
+-->
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CLEAN 渲染小样</title>
+<style>
+  :root{
+    --paper:#f5efe4; --ink:#2a2520; --ink-soft:#5c554c; --ink-faint:#8a8278;
+    --rule:#c9bfae; --accent:#b04a2f; --accent-soft:#d68a72;
+    --serif-zh:'Noto Serif SC',-apple-system,'PingFang SC',serif;
+    --sans:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  [data-theme="dark"]{
+    --paper:#1a1612; --ink:#e8dfd1; --ink-soft:#b5ac9e; --ink-faint:#7a7264;
+    --rule:#3a3128; --accent:#e07050; --accent-soft:#a85b3f;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:var(--serif-zh); line-height:1.7;
+    max-width:640px; margin:60px auto; padding:0 24px;
+  }
+  .turn{margin:28px 0}
+  .turn-head{display:flex; align-items:baseline; gap:12px; margin-bottom:10px}
+  .speaker{font-family:var(--sans); font-size:12px; font-weight:600; letter-spacing:.04em; color:var(--accent)}
+  .timestamp{font-family:var(--sans); font-size:11px; color:var(--ink-faint); letter-spacing:.05em}
+  p.zh{font-family:var(--serif-zh); font-size:16.5px; color:var(--ink); line-height:1.75; margin:0}
+
+  /* ── CLEAN 阶段:可折叠逐字底档 + 存疑标注 ── */
+  details.raw-transcript{margin:24px 0 8px; border-top:1px dashed var(--rule)}
+  details.raw-transcript summary{
+    font-family:var(--sans); font-size:12.5px; letter-spacing:.04em;
+    color:var(--ink-faint); cursor:pointer; padding:10px 0; list-style:none;
+  }
+  details.raw-transcript summary::before{content:"▸ "; color:var(--accent)}
+  details.raw-transcript[open] summary::before{content:"▾ "}
+  details.raw-transcript .turn{opacity:.85}
+  mark.asr-uncertain{
+    background:transparent; color:var(--accent);
+    border-bottom:1px dotted var(--accent-soft); cursor:help;
+  }
+</style>
+</head>
+<body>
+
+  <div class="turn">
+    <div class="turn-head">
+      <span class="speaker">嘉宾</span>
+    </div>
+    <p class="zh">我们最早看的那篇论文其实提到过一个<mark class="asr-uncertain" title="ASR存疑">a paper?</mark>,当时没太当回事。</p>
+  </div>
+
+  <details class="raw-transcript">
+    <summary>展开逐字原稿</summary>
+    <div class="turn">
+      <div class="turn-head">
+        <span class="speaker">嘉宾</span>
+        <span class="timestamp">00:12:03</span>
+      </div>
+      <p class="zh">呃,我们最早看的那篇,就是,嗯,叫 a paper 是吧,反正提到过一个东西,当时没太当回事。</p>
+    </div>
+  </details>
+
+</body>
+</html>

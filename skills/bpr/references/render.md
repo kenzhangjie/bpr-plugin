@@ -109,6 +109,11 @@ CSS 已经写在 `templates/base.html`(`.bilingual` / `.bilingual .en` / `.bilin
 
 (podcast 模式:把 `.bilingual` 包在 `.turn-body` 内,前面有 `.turn-head` 显示 speaker + timestamp。)
 
+### 中文模式正文(CLEAN 之后)
+- 书面正文为默认阅读面:按说话人分段,`<div class="turn">` + `<p class="zh">`(书面句)。
+- 每章末尾放逐字底档:`<details class="raw-transcript"><summary>展开逐字原稿</summary>{该章火山原始 turn,带时间戳}</details>`。
+- Analyze/Review 标的 `⟨?X⟩` → 渲染为 `<mark class="asr-uncertain" title="ASR存疑">X?</mark>`。
+
 ### 例外
 
 - 用户明确要求"只排英文" → 跳过中文,仅输出英文版
