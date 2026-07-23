@@ -77,6 +77,16 @@ CLEAN 阶段(Round 1)
 - 不回退:CLEAN 4 词回归样本仍过。
 - e2e:该 URL 跑通 抓取(含 shownote)→2.0 裸跑→CLEAN(用 shownote)→渲染。
 
+## 4.5 三份专名表分工(2026-07-23 定案:不合并)
+
+| 表 | 层 | 角色 | 维护 |
+|---|---|---|---|
+| `~/.config/volc/boosting.txt` → 火山热词表 `bpr-ai-vc` | ASR 源头 | 手挑易错固定专名(≤10 字/词)提字准 | 手动精选 |
+| `~/.config/volc/glossary.txt` | CLEAN 下游参考 | 常驻词库 | **保留**;后续方向=**从多期 shownote 批量挖掘自动沉淀**(clean.md 的"Analyze 回写 glossary" 是其手动前身) |
+| `~/.config/volc/correct_table.json` | 转录后兜底 | 错→对精确映射(非词表) | 踩坑即补 |
+
+内容有重叠但层/机制不同,**有意不合并**:glossary 未来会长成"shownote 挖掘出的知识库",与手挑热词表分道。
+
 ## 5. 风险
 
 - **2.0 偶发 55000001**:裸跑那次成功了,但需观察稳定性;env 可秒回退 1.0。
