@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# hotword — 火山引擎豆包语音 热词表管理 CLI 封装
+# 用法与 volcengine_hotword.py 完全一致,只是更短、且在任意目录可跑。
+# 例:  hotword list
+#       hotword add bpr-ai-vc codex|7 鹅厂|6
+#       hotword show bpr-ai-vc
+set -euo pipefail
+# 解析软链,拿到脚本真实所在目录(支持从 ~/.local/bin 软链调用)
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+exec python3 "$DIR/volcengine_hotword.py" "$@"
