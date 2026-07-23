@@ -227,16 +227,16 @@ scripts/fetch/fetch_bilibili.sh "<URL>" "$WORKDIR"
 # fetch_xiaoyuzhou.sh / fetch_bilibili.sh 已给出音频直链(metadata.json 的 audio_url),
 # 火山可直接吃 URL,省掉重新上传那一步。
 AUDIO_URL=$(python3 -c "import json;print(json.load(open('$WORKDIR/metadata.json'))['audio_url'])")
-# --meta 把本期标题/简介 + ~/.config/volc/glossary.txt 常驻专名表拼成 context 偏置喂给模型,
-# 中英混录的英文品牌名/术语在识别阶段就转对,别再靠事后 correct_table 替换。
-python3 ~/.config/volc/volc_asr.py "$AUDIO_URL" "$WORKDIR/transcript.txt" --meta "$WORKDIR/metadata.json"
+# 裸跑,不传 context:火山 2.0(默认 volc.seedasr.auc)传 corpus.context 会 55000001 内部错误。
+# 专名纠错交给下游 CLEAN 阶段(用 metadata 的 shownote + glossary.txt 做参考)。
+python3 ~/.config/volc/volc_asr.py "$AUDIO_URL" "$WORKDIR/transcript.txt"
 ```
 
-**质量偏置三层(强→弱)**:
+**2.0 裸跑 + 纠错分工(2026-07-23 实测定案)**:
 
-1. `corpus.context`(--meta 自动 + glossary.txt):本期元数据(标题/简介) + 常驻专名表,在识别时直接偏置模型,转录准确度最高。
-2. `corpus.boosting_table_name`(--boosting 控制台表):云端管理的特定领域术语表,精度次于上层。
-3. `correct_table.json`(事后替换,兜底):本地硬映射表,仅修正遗漏,不影响上游两层的转录结果。
+1. **ASR = 火山 2.0 裸跑**(env `VOLC_ASR_RESOURCE`,默认 `volc.seedasr.auc`;出问题设 `volc.bigasr.auc` 回退 1.0)。**不传 context**——2.0 一传 `corpus.context` 就 55000001;2.0 裸跑基础已较强(Anthropic/CoWork/scaling 零偏置即对)。
+2. **专名纠错 = 下游 CLEAN**(`clean.md`):Analyze/Review 读 metadata 的 **shownote + `podcast` 名 + glossary.txt**,把残留专名(Aultimate→Altimeter、小俊→小珺)纠对——shownote 是比 ASR 更可信的独立信源。
+3. `correct_table.json`(事后替换,兜底):本地无歧义硬映射,补前两步遗漏。
 
 输出 `transcript.txt` 是 `Speaker N HH:MM:SS.mmm` 格式(与妙记导出一致,下游无需改),
 并自动套用 `~/.config/volc/correct_table.json` 的专名硬映射(Higgsfield / Hockey Stick Growth / Midjourney …)。

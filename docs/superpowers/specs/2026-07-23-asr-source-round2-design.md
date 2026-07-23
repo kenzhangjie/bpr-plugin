@@ -1,90 +1,89 @@
-# ASR 源头优化 Round 2 · 火山 2.0 + shownote context
+# ASR 源头优化 Round 2 · 火山 2.0(裸跑)+ shownote 喂 CLEAN
 
-- **日期**:2026-07-23
-- **状态**:已通过 brainstorming,待 writing-plans
-- **影响范围**:`~/.config/volc/volc_asr.py`(非版本控制)、`bpr-plugin/skills/bpr/scripts/fetch/fetch_xiaoyuzhou.sh`(版本控制)、`~/.config/volc/glossary.txt`
-- **前置**:Round 1(CLEAN 阶段)已上线(v1.6.0)。本轮是它上游的源头质量提升。
+- **日期**:2026-07-23(spike 后按实测改版)
+- **状态**:已通过 brainstorming + spike 实测校正,执行中
+- **影响范围**:`~/.config/volc/volc_asr.py`(非版本控制)、`bpr-plugin/skills/bpr/scripts/fetch/fetch_xiaoyuzhou.sh`、`skills/bpr/references/clean.md`、`ingest.md`、`~/.config/volc/glossary.txt`
+- **前置**:Round 1(CLEAN 阶段)已上线(v1.6.0)。
 
 ---
 
-## 1. 问题 / 动机
+## 0. Spike 实测结论(推翻了初版设计,记录在案)
 
-Round 1 用 LLM 后处理(CLEAN)兜底 ASR 错词。本轮从**源头**再压一层,让火山少犯错:
+拿真 URL(Freda 投资札记第2集,1.5h)实测火山 2.0(`volc.seedasr.auc`):
 
-1. **模型仍是 1.0**:`volc_asr.py` 的 `RESOURCE_ID = "volc.bigasr.auc"` 是豆包录音识别 **1.0**。2.0(`volc.seedasr.auc`)准确率更高、**上下文关键词召回 +20%**、中英混录更强。
-2. **shownote 没吃到**:`fetch_xiaoyuzhou.sh` 只抓 `og:description` 且截断 500 字,**完整 shownote(嘉宾/公司/专题名的金矿)没抓**。2.0 强上下文,shownote 喂进 `corpus.context` 正中其长处。
+1. **2.0 不吃 `corpus.context`**:传 context(2429 或 500 字)必在 ~180s 报 `55000001 OperatorWrapper 内部错误`;去掉 context 立即成功(842 句)。→ **ASR 层不能再做 context 偏置**。
+2. **2.0 裸跑基础更强但非完美**:`Anthropic/OpenAI/CoWork/Snowflake/Robinhood/Cursor/scaling` 零偏置全对;仍错 `Aultimate Capital`(应 Altimeter)、1 处 `skating`、1 处 `克洛`、`小俊`(应小珺)。
+3. **word 级 `confidence` 字段全为 0**(26744 词) → **置信度驱动 flagging 不可行**,放弃。
+4. schema 兼容:`utterances[].additions.speaker` + `words[]`(带词级时间戳)在 → `to_transcript` 无需改。
 
-## 2. 目标 / 非目标
+**结论**:shownote 的价值不在 ASR 偏置,而在**喂给下游 CLEAN LLM 做推理纠错**(LLM 能"读 shownote 里的 Altimeter Capital → 改对 Aultimate")。ASR 层改用 **2.0 裸跑**吃其更强基础。
+
+## 1. 目标 / 非目标
 
 **目标**
-- 火山 ASR 从 1.0 迁移到 2.0(`volc.seedasr.auc`),可 env 配置、可回退 1.0。
-- 抓取完整 shownote,拼进 `corpus.context` 偏置(叠加 glossary.txt)。
-- 先跑 2.0 实测 spike,确认契约再铺开。
+- 火山 ASR 迁到 **2.0(`volc.seedasr.auc`),裸跑不传 context**;env 可回退 1.0。
+- 抓完整 shownote,作为 **CLEAN 阶段的纠错参考**(不是 ASR context)。
+- CLEAN 的 Analyze/Review 消费 shownote + glossary,定向纠专名。
 
-**非目标(明确砍掉)**
-- **控制台热词表(boosting_table_name)**:火山无管理 API 无法自动同步;与 context 装同一批词、context 还自动新鲜 → 冗余。**单轨 context**。
-- **英文独立 ASR 模型**:2.0 支持英文;英文内容多走 YouTube 字幕不过 ASR。真撞上"英文音频+无字幕"再单开 spec。
-- 不动 CLEAN 阶段本身(Round 1 已上线)。
+**非目标(实测后砍掉)**
+- ~~ASR `corpus.context` 偏置~~:2.0 直接崩;biasing 移到 CLEAN LLM。
+- ~~置信度驱动 flagging~~:confidence 全 0,不可行。
+- ~~控制台热词表~~、~~英文独立模型~~:同初版(单轨、YAGNI)。
 
-## 3. 架构 / 数据流
+## 2. 架构 / 数据流
 
 ```
 小宇宙 URL → fetch_xiaoyuzhou.sh
    ├─ audio.m4a
-   └─ metadata.json { title, podcast, shownote(完整), publish_date, audio_url, … }
+   └─ metadata.json { title, podcast, shownote(完整), … }
                     ↓
-volc_asr.py --meta metadata.json
-   RESOURCE_ID = $VOLC_ASR_RESOURCE(默认 volc.seedasr.auc = 2.0)
-   build_context() = title + shownote + glossary.txt  → corpus.context
+volc_asr.py  (RESOURCE_ID=$VOLC_ASR_RESOURCE, 默认 volc.seedasr.auc=2.0)
+   请求体不含 corpus/context  →  transcript.txt(2.0 裸跑,基础强)
                     ↓
-   transcript.txt(2.0 转录,专名召回 ↑)→ 进 CLEAN 阶段(不变)
+CLEAN 阶段(Round 1)
+   Analyze 读入 shownote + glossary.txt 作纠错参考
+   Review 用它把残留专名纠对(Aultimate→Altimeter、小俊→小珺、skating→scaling…)
+                    ↓
+   书面正文 + 可折叠逐字底档(不变)
 ```
 
-## 4. 组件
+## 3. 组件
 
-### 4.1 2.0 迁移(volc_asr.py)
-- `RESOURCE_ID` 改为读 env `VOLC_ASR_RESOURCE`,缺省 `volc.seedasr.auc`;设 `volc.bigasr.auc` 即回退 1.0。
-- 端点不变(标准版 2.0 复用 `/api/v3/auc/bigmodel/submit` + `/query`)。
-- `--boosting` flag 保留但默认不用(单轨 context;留着不碍事)。
+### 3.1 volc_asr.py(2.0 裸跑)
+- `RESOURCE_ID = os.environ.get("VOLC_ASR_RESOURCE") or "volc.seedasr.auc"`(已改)。
+- **移除请求体里的 `corpus`/`context`**(2.0 崩;biasing 已移到 CLEAN)。`build_context()` 及 `--context/--glossary/--boosting` 相关参数一并删除或退役(清理上一轮加的、现已死的代码)。
+- 端点、鉴权、`to_transcript`、`correct_table.json` 兜底不变。
 
-### 4.2 完整 shownote 抓取(fetch_xiaoyuzhou.sh)
-- 现状:`desc = og:description`,截断 `desc[:500]`。
-- 改:从 episode 页面正文提取**完整 shownote**(小宇宙页面有 shownote 区块;JSON-LD 或正文 DOM),存 metadata.json 的新字段 `shownote`(完整,不截断或放宽到合理上限如 4000 字)。`description` 字段保留兼容。
-- 抓不到完整 shownote 时,回退用 `og:description`(不硬失败)。
+### 3.2 fetch_xiaoyuzhou.sh(完整 shownote)
+- 从页面 `__NEXT_DATA__` 的 `shownotes` 字段提完整 shownote(HTML→纯文本)→ metadata.json 新增 `shownote` 字段(完整,不截 500)。抓不到回退 og:description,不硬失败。
+- 已验证该页面结构:`__NEXT_DATA__` 里有 `shownotes`,含正文 + OUTLINE(全专名 + 时间戳)。
 
-### 4.3 context 升级(volc_asr.py build_context)
-- `build_context()` 已读 metadata 的 title/podcast/description;新增读 `shownote` 字段。
-- 拼接顺序:title + shownote + glossary.txt;总长按 2.0 的 context 上限截断(spike 确认上限;暂定沿用 ~1000,若 2.0 允许更长则放宽)。
+### 3.3 clean.md(CLEAN 消费 shownote)
+- Analyze 步骤(Round 1 clean.md Step A)新增:**读入 metadata.json 的 title + podcast + shownote + `~/.config/volc/glossary.txt`**,作为"术语表 + 存疑清单"的权威来源。
+  - ⚠️ 必须含 **podcast/series 名字段**:主持人本名(如"张小珺"的"珺")常只在节目名里,不在 shownote 正文——验证时只喂 shownote 正文导致 `小俊` 被误纠成 `小军`(仍错);喂上 podcast 名才有"珺"。
+- Review 步骤:遇专名/同音词,**优先对照 shownote 里的写法**纠正(shownote 是嘉宾/主持给的 ground truth)。
+- glossary.txt 从"ASR context 底料"**重定位为"CLEAN 纠错词库"**。
 
-### 4.4 spike(先跑,gate 后续)
-拿真 URL `https://www.xiaoyuzhoufm.com/episode/6a09d58b1b7bd502955258ab` 实测 2.0,确认 3 件事:
-1. 请求体 `model_name` 是否仍 `"bigmodel"`(换错 submit 报错)。
-2. 响应结构是否变(`to_transcript()` 靠 `result.utterances[].additions.speaker` + `.text` + `.start_time`;变了要改解析)。
-3. 响应带不带 word 级 `confidence`(定后续"置信度驱动 flagging"可行性;本轮只记录不实现)。
-- **spike 通过 → 铺开 4.1-4.3;spike 挂 → env 回退 1.0,修解析后再切。**
+### 3.4 ingest.md
+- 更新火山命令(去 `--meta/--context`,注明 2.0 裸跑);说明 shownote 抓取 + 它流向 CLEAN 而非 ASR。
 
-## 5. 验证 / 成功标准
+## 4. 验证 / 成功标准
 
-- **spike**:同一期音频 1.0 vs 2.0 转录并排,专名错词(克洛蔻/阿帕比类)肉眼变少;记录 2.0 是否带 confidence。
-- **shownote**:metadata.json 的 `shownote` 字段含完整正文(非 500 截断);build_context stderr 日志可见 shownote 内容进了 context。
-- **不回退**:CLEAN 的 4 词回归样本仍过。
-- **e2e**:该 URL 跑通 抓取→2.0→CLEAN→渲染 全链路。
+- **已完成(spike)**:2.0 裸跑转录成功、schema 兼容、context 会崩已确认。
+- **待验(本轮核心)**:把刚跑出的**真实 2.0 transcript 的相关片段 + shownote** 喂 CLEAN Review,确认 `Aultimate→Altimeter`、`小俊→小珺`、`skating→scaling` 被纠对 → **证明 shownote→CLEAN 这条链真有效**。
+- 不回退:CLEAN 4 词回归样本仍过。
+- e2e:该 URL 跑通 抓取(含 shownote)→2.0 裸跑→CLEAN(用 shownote)→渲染。
 
-## 6. 同步策略(单轨的好处)
+## 5. 风险
 
-- 词库单一源 = `~/.config/volc/glossary.txt`(我维护)。
-- context 直传每次现读 glossary.txt + 现抓 shownote → **永远新鲜、零漂移、零手工**。
-- 无控制台表 = 无需人工重传、无 hash 漂移检测。
+- **2.0 偶发 55000001**:裸跑那次成功了,但需观察稳定性;env 可秒回退 1.0。
+- **shownote 抓取脆**:页面结构变 → 回退 og:description。
+- **shownote 与口误冲突**:shownote 偶尔与嘉宾口误不一致 → Review 以"忠于音频说了什么"为准,shownote 仅作专名候选参考(不覆盖内容)。
 
-## 7. 风险
+## 6. 要改的文件
 
-- **2.0 契约漂移**:model_name/响应结构与 1.0 不同 → spike 先验,env 可秒回退 1.0,`to_transcript` 按需改。
-- **shownote 抓取脆**:小宇宙页面结构变 → 回退 og:description,不硬失败。
-- **context 超长**:shownote 可能很长 → 按上限截断,优先保 glossary + shownote 头部专名密集段。
-
-## 8. 要改的文件
-
-- `~/.config/volc/volc_asr.py`(**非版本控制**):RESOURCE_ID env 化 + build_context 读 shownote。
-- `bpr-plugin/skills/bpr/scripts/fetch/fetch_xiaoyuzhou.sh`(版本控制):抓完整 shownote。
-- `bpr-plugin/skills/bpr/references/ingest.md`:补 2.0 / shownote / env 说明。
-- `~/.config/volc/glossary.txt`:按需补词(内容维护,非结构改动)。
+- `~/.config/volc/volc_asr.py`(非版本控制):RESOURCE_ID env(已改)+ 删 corpus/context 及退役 build_context。
+- `skills/bpr/scripts/fetch/fetch_xiaoyuzhou.sh`:抓完整 shownote。
+- `skills/bpr/references/clean.md`:Analyze/Review 消费 shownote + glossary。
+- `skills/bpr/references/ingest.md`:更新说明。
+- `~/.config/volc/glossary.txt`:重定位为 CLEAN 纠错词库(内容维护)。

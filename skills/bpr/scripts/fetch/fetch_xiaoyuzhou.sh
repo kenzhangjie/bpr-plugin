@@ -121,6 +121,31 @@ if jsonld_series:
 elif not podcast:
     podcast = "小宇宙"
 
+# --- Pass 3: 完整 shownote,来自 __NEXT_DATA__(og:description 只是 500 摘要;
+# shownote 才是专名金矿——嘉宾/公司/产品/OUTLINE 全在,喂给下游 CLEAN 做纠错参考)---
+shownote = ""
+mnd = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html, re.DOTALL)
+if mnd:
+    try:
+        nd = json.loads(mnd.group(1))
+        found = []
+        def _walk(o):
+            if isinstance(o, dict):
+                if isinstance(o.get("shownotes"), str):
+                    found.append(o["shownotes"])
+                for v in o.values(): _walk(v)
+            elif isinstance(o, list):
+                for v in o: _walk(v)
+        _walk(nd)
+        if found:
+            sn = max(found, key=len)          # 最长的那个 = episode 完整 shownote
+            sn = unescape(re.sub(r'<[^>]+>', '', sn))   # 去 HTML 标签
+            shownote = re.sub(r'\n{3,}', '\n\n', sn).strip()
+    except Exception:
+        pass
+if not shownote:                              # 抓不到完整 shownote 回退 og:description,不硬失败
+    shownote = desc
+
 # Episode id from URL (stored in $URL by caller, parse from page <link rel=canonical> if available)
 m = re.search(r'<link\s+rel=["\']canonical["\']\s+href=["\'][^"\']*?/episode/([a-z0-9]+)', html, re.IGNORECASE)
 episode_id = m.group(1) if m else ""
@@ -145,7 +170,8 @@ meta = {
     "source":     "xiaoyuzhou",
     "title":      title,
     "podcast":    podcast,
-    "description": desc[:500],
+    "description": desc[:500],       # og:description 摘要(保留兼容)
+    "shownote":   shownote,          # 完整 shownote → 下游 CLEAN 纠错参考(非 ASR context)
     "publish_date": pub_date,        # YYYY-MM-DD (real episode pubDate from JSON-LD)
     "duration":   jsonld_duration,   # ISO 8601 e.g. "PT230M"
     "audio_url":  audio_url,
@@ -160,6 +186,7 @@ print(f"  title:        {title}")
 print(f"  podcast:      {podcast}")
 print(f"  publish_date: {pub_date or '(not found)'}")
 print(f"  duration:     {jsonld_duration or '(not found)'}")
+print(f"  shownote:     {len(shownote)} 字{' (回退 og:description)' if shownote == desc else ''}")
 print(f"  audio:        {audio_url}")
 PYEOF
 

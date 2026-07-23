@@ -10,11 +10,19 @@
 - 英文/双语 → 跳过。
 
 ## Step A · Analyze(主代理,全稿 1 次)
-在切窗分派前,通读全稿产出一份 brief,塞进每个子代理 prompt(保跨窗一致):
-1. **领域术语表**:本期专名(人/公司/产品/模型名)+ 高频英文术语,标注哪些保留英文、哪些固定中文。AI/科技/投资/growth 领域优先。
-2. **说话人 + 语气**:host / guest 分别的语气。
-3. **存疑词清单**:扫全稿标出可疑中英混词(疑似同音/近音错、拼写不成词的英文),供 Review 重点核。
-> Analyze 产出的专名清单,完成后回写 `~/.config/volc/glossary.txt`(Ken 过目合入),反哺下期 ASR 偏置。
+先读入**权威参考**,再通读全稿产出 brief(塞进每个子代理 prompt,保跨窗一致)。
+
+**输入参考(小宇宙自带,是纠专名的 ground truth——比 ASR 更可信)**:
+- `metadata.json` 的 **title + podcast + shownote**(fetch_xiaoyuzhou.sh 已抓完整 shownote):嘉宾/公司/产品名、OUTLINE 全在里面。
+  - ⚠️ **必带 `podcast` 字段**:主持人本名常只在节目名里(如"张小珺Jùn｜商业访谈录"的"珺"),shownote 正文没有——不喂 podcast 名,`小俊/小军` 就纠不对(实测踩过)。
+- `~/.config/volc/glossary.txt`:常驻专名词库。
+
+产出 brief:
+1. **领域术语表**:综合 shownote + glossary,列本期专名(标保留英文/固定中文)。AI/科技/投资/growth 优先。
+2. **说话人 + 语气**:host / guest(host 名从 `podcast` 字段拿)。
+3. **存疑词清单**:扫全稿标可疑中英混词(同音/近音错、拼不成词的英文),供 Review 重点核。
+> **为什么 shownote 是关键**:它是 ASR 之外的独立信源。ASR 把基金名转成 Aultimate/Ultimatum,shownote 里白纸黑字 Altimeter Capital → Review 据此一次纠对(2026-07-23 实测有效)。
+> Analyze 新扒的专名回写 `~/.config/volc/glossary.txt`(Ken 过目合入),供下期复用。
 
 ## Step B · 切窗
 - CLEAN 在语义切章(STRUCTURE)之前,不能按章切 → 按**固定 turn 窗口(~25 条)**切。
@@ -29,7 +37,8 @@
 你在做中文播客 ASR 逐字稿的纠错 + 书面化。这是第 N 窗逐字原文,和全局 brief。
 
 【全局 brief】
-术语表:{glossary}
+术语表(综合 shownote + glossary):{glossary}
+shownote 关键专名(ground truth,优先据此纠专名):{shownote_names}
 说话人/语气:{speakers}
 存疑词清单:{suspects}
 
@@ -38,6 +47,7 @@
 
 分两步做,只输出最终书面中文:
 1) Review(纠错,只对原文负责):按上下文 + 术语表修同音/近音错词、专名、断句。
+   **专名与 shownote 不一致时,信 shownote 的写法**(如 Aultimate→Altimeter);
    不可判的词绝不硬编,标 ⟨?你的猜测⟩ 留待定夺。
 2) Polish(书面化,只改怎么说不改说了什么):去口水词(呃/就是/对吧/然后…)、
    合并重组成通顺书面段落。**每个论点/数字/专名/因果必须保下来**,通顺不许吞信息。
