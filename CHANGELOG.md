@@ -5,6 +5,17 @@ All notable changes to this plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.6.0 — 2026-07-23
+
+**新增 CLEAN 阶段(ASR 后处理三步法)**,治火山 ASR 中文逐字稿两大硬伤:中英混录同音/近音错词 + 逐字口语可读性差。
+
+- **流水线 7→8 阶段**:PREP 与 STRUCTURE 之间插入 **CLEAN**(仅中文模式)。见新 `references/clean.md`。
+- **analyze / review / polish 三步法**(翻译四步法去掉 Translate):Analyze 全稿定术语表 + 存疑清单 → 按 ~25 turn 切窗,子代理 Review(纠错)+ Polish(书面化)。错词四分类:同音近音 / 专名 / 断句直接改,真不可判标 `⟨?候选词⟩` 不硬编。
+- **中文正文铁律修订**:旧「逐字全量、不概括」→ **书面正文 + 可折叠逐字底档**(每章 `<details>` 留档,内容 == 火山原稿,不丢);Polish 只改「怎么说」不改「说了什么」,书面化 ≠ 概括。
+- **渲染**(`render.md` + `base.html`):中文书面正文 + `<details class="raw-transcript">` 折叠底档 + `<mark class="asr-uncertain">` 存疑标注样式。
+- **VERIFY 双路径**(`verify.md`):英文双语走句数覆盖闸,**中文 CLEAN 走实体覆盖闸**(数字/专名/论点实体不丢);加零幻觉抽查 + 4 词回归样本 fixture。
+- **火山 ASR 偏置反哺**(`ingest.md`):`volc_asr.py --meta` 把标题/简介 + `~/.config/volc/glossary.txt` 拼成 `corpus.context` 偏置,识别阶段就少错;`enable_ddc` 保持关(底档要真逐字)。
+
 ## v1.5.0 — 2026-07-12
 
 **架构重构(behavior-preserving)**,治四层乱:
