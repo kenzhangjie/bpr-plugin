@@ -62,10 +62,10 @@ TL;DR · 速读 (5-15 条)
   - 配一个 "为什么非共识" 短解释 (中文,1-2 句)
   - 可选:多数人怎么想(对比锚点)
 ─────────────────
-章节正文逐字全文 (8-12 章)
+章节正文:书面正文 + 可折叠逐字底档 (8-12 章)
   - 正文由 CLEAN 阶段产出(书面版);逐字底档见 render.md 的 <details> 约定
   - 每章:ASR 逐句原文按说话人合并成 `.turn`(speaker + timestamp + 逐句 `<p class="zh">`)
-  - **逐字全量,不概括**;覆盖率同英文 ≥85% 硬闸
+  - 覆盖率用**信息/实体级覆盖**(不再是句数 ≥85% 硬闸);正文书面重写,底档逐字留存,不丢内容
   - 中文单语,没有 .bilingual(不需要翻译)
 ─────────────────
 Footer(来源 + 元信息)
@@ -80,7 +80,7 @@ Footer(来源 + 元信息)
 | `.turn-head` speaker / timestamp | 视情况渲染 | ✓ **正文渲染**(逐字 turn) |
 | TL;DR 4 元素结构 | 中文论点 + 英文金句 + 英文上下文 + 中文解释 | **仅 2 元素**:中文论点 + 中文解释 |
 | **非共识 section** | ✗ 不渲染 | ✓ **必须有** |
-| 章节正文 | 逐句双语对照 | **逐字全文**(`.turn`,中文单语,不概括) |
+| 章节正文 | 逐句双语对照 | 书面正文(CLEAN 重写)+ 可折叠逐字底档 |
 
 ### 非共识 section 写作原则
 
@@ -111,28 +111,13 @@ Footer(来源 + 元信息)
 
 CSS 写在 `templates/base.html` 的"中文模式扩展样式"section。
 
-### 章节正文逐字全文(中文模式)
+### 章节正文:书面正文 + 可折叠逐字底档(中文模式)
 
-**跟英文双语模式的区别只是"没有 .en/翻译那一半"**,结构照样是 podcast `.turn` 逐字:每章把 ASR 逐句原文按说话人合并成 turn,speaker + timestamp + 每句一个 `<p class="zh">`,**全量不概括**。
+正文由 CLEAN 阶段(见 `clean.md`)产出书面版:说话人 + 时间戳保留,内容书面重写为可读中文,但**书面化 ≠ 概括**——每个论点/数字/专名/因果必须保下来,Polish 只改"怎么说"不改"说了什么"。
 
-```html
-<section class="chapter" id="chN">
-  <div class="ch-num">Chapter 0N</div>
-  <h2>章节中文标题</h2>
-  <div class="ch-range">15:30 — 28:45 · 关键词概括</div>
-  <div class="turn">
-    <div class="turn-head"><span class="speaker" data-role="host">主持人名</span><span class="timestamp">00:15:30</span></div>
-    <div class="turn-body">
-      <p class="zh">逐句原文 1。</p>
-      <p class="zh">逐句原文 2。</p>
-    </div>
-  </div>
-  <!-- 更多 .turn,覆盖全章 -->
-</section>
-```
+逐字口语原稿按章放进可折叠底档,内容 == ASR 原始 transcript,不丢、不概括,供读者对照查证。**渲染细节(HTML 结构、`<details>` 约定、CSS)见 `render.md`**,本文件不重复规定。
 
-> CSS:`.turn-body .zh` 若模板没定义(base.html 的 `.zh` 在 `.bilingual` 里),在 `<style>` 末尾补一条独立样式(见 2026-07-11 张小珺×Freda 那篇的做法:`font-family:var(--serif-zh);border-left:2px solid var(--rule);padding-left:14px`)。
-> **弃用**:旧的 `.ch-summary` 200-400 字浓缩版型已不用(Ken 要逐字);`ch-pull` 也不再需要(金句已在非共识区)。
+> **弃用**:旧的 `.ch-summary` 200-400 字浓缩版型已不用;`ch-pull` 也不再需要(金句已在非共识区)。
 
 ### 文件名约定(中文模式)
 
