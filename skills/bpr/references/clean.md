@@ -23,7 +23,7 @@
 2. **说话人 + 语气**:host / guest(host 名从 `podcast` 字段拿)。
 3. **存疑词清单**:扫全稿标可疑中英混词(同音/近音错、拼不成词的英文),供 Review 重点核。
 > **为什么 shownote 是关键**:它是 ASR 之外的独立信源。ASR 把基金名转成 Aultimate/Ultimatum,shownote 里白纸黑字 Altimeter Capital → Review 据此一次纠对(2026-07-23 实测有效)。
-> Analyze 新扒的专名回写 `~/.config/volc/glossary.txt`(Ken 过目合入),供下期复用。
+> **专名飞轮(自动)**:Analyze 出的本期专名清单,CLEAN 结束时**自动 append 进 `~/.config/volc/glossary.txt`**(与已有去重,`专名|权重` 格式,权重按出现频次/置信给默认);其中 **≤10 字的单 token 子集**另吐 `~/.config/volc/hotword-candidates.txt`,当火山热词表 `bpr-ai-vc` 的更新待选。Ken 偶尔扫一眼 glossary 去噪即可,不用每期手动加。跑得越多,专名越准 —— 复利。
 
 ## Step B · 切窗
 - CLEAN 在语义切章(STRUCTURE)之前,不能按章切 → 按**固定 turn 窗口(~25 条)**切。
@@ -53,16 +53,32 @@ shownote 关键专名(ground truth,优先据此纠专名):{shownote_names}
 2) Polish(书面化,只改怎么说不改说了什么):去口水词(呃/就是/对吧/然后…)、
    合并重组成通顺书面段落。**每个论点/数字/专名/因果必须保下来**,通顺不许吞信息。
 
-按说话人分段输出,保留时间戳锚点。不要输出解释,只要正文。
+**输出格式(硬约束,render_zh.py 靠它解析,别乱来)**:
+- 每个 turn 起始**必须独占一行**:`Speaker N HH:MM:SS`(N 用原窗的说话人号,时间戳照抄原句起始)。
+- **禁止 markdown 加粗**(不许写 `**Speaker 2 01:15:43**`)、禁止把正文跟在 header 同一行——正文**另起段**。
+- 违反此格式,渲染会把 turn 当成字面文本渲染出来(2026-07-23 ch11 实测踩过)。
+不要输出解释,只要正文。
 ```
 
 高密度章(非共识金句)可升级:Review、Polish 各一次独立调用(见 translate.md 极致版)。
+
+## Step C.5 · 保真闸(每窗 Polish 后自动对账)
+书面重写是"软"操作,子代理可能悄悄吞数字/漏论点/改因果。每窗 Polish 完,派一个**廉价对账子代理(haiku 级)**只做一件事:
+
+```
+拿【原始窗】和【书面窗】逐条核对:数字、专名、论点实体、因果方向 —— 有没有丢或被改?
+只输出 JSON:{"missing":[...], "altered":[...]}(各列具体项;都没有则空数组)。
+```
+
+- 清单**非空** → 把该窗**打回 Polish 重做一次**(把 missing/altered 塞进重做 prompt 让它补回)。
+- 重做仍不过 → 该窗把丢失项标 `⟨?丢失:xxx⟩` 留人,不无限重试。
+- 成本比 Polish 低一个数量级,但把"软护栏"变硬闸。
 
 ## Step D · 错词四分类
 | 类 | 例 | 处理 |
 |---|---|---|
 | 1 同音/近音 | skating→scaling、constrain→constraint、unprobability→unpredictability | 上下文直接改 |
-| 2 专名 | 克洛蔻→Claude、阿帕比→a paper、小俊→小珺 | 术语表比对后改 |
+| 2 专名 | 克洛蔻→Claude、阿帕比→Anthropic、Aultimate→Altimeter、小俊→小珺 | 术语表/shownote 比对后改 |
 | 3 断句/标点 | 两句黏一句 | 重新断句 |
 | 4 真不可判 | 连人都拿不准 | 标 ⟨?猜测⟩ 不硬编;confidently wrong 比留错更坏 |
 

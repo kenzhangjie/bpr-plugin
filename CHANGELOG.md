@@ -5,6 +5,16 @@ All notable changes to this plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.6.2 — 2026-07-23
+
+**CLEAN 硬化(grilling 三项)+ 修 ch11 render bug。**
+
+- **RENDER 脚本化**(Q3):新增 `scripts/publish/render_zh.py`,中文模式渲染从 agent 手写改为确定性脚本(消灭 L2/L3 render 回归)。render.md 改为指向脚本。
+- **CLEAN 输出格式硬约束 + 修 bug**:子代理曾输出 `**Speaker N ts**` markdown 内联,导致渲染成字面文本(ch11 实测)。clean.md 钉死"turn 头独占行 `Speaker N HH:MM:SS`、禁 markdown 加粗";render_zh.py 解析器同时兼容两种格式兜底。
+- **保真闸**(Q1):clean.md 新增 Step C.5——每窗 Polish 后 haiku 对账子代理核 missing/altered,非空打回重做、仍不过标 `⟨?丢失⟩`。
+- **专名飞轮**(Q6):Analyze 专名自动 append 进 glossary.txt(去重/权重)+ ≤10字 子集吐 hotword-candidates.txt。
+- 修 Step D 陈旧示例(阿帕比→Anthropic,非 "a paper")。
+
 ## v1.6.1 — 2026-07-23
 
 **ASR 源头优化 Round 2 + landing 排序恢复。** (spec: `docs/superpowers/specs/2026-07-23-asr-source-round2-design.md`)

@@ -109,10 +109,18 @@ CSS 已经写在 `templates/base.html`(`.bilingual` / `.bilingual .en` / `.bilin
 
 (podcast 模式:把 `.bilingual` 包在 `.turn-body` 内,前面有 `.turn-head` 显示 speaker + timestamp。)
 
-### 中文模式正文(CLEAN 之后)
-- 书面正文为默认阅读面:按说话人分段,`<div class="turn">` + `<p class="zh">`(书面句)。
-- 每章末尾放逐字底档:`<details class="raw-transcript"><summary>展开逐字原稿</summary>{该章火山原始 turn,带时间戳}</details>`。
-- Analyze/Review 标的 `⟨?X⟩` → 渲染为 `<mark class="asr-uncertain" title="ASR存疑">X?</mark>`。
+### 中文模式正文(CLEAN 之后)—— **用脚本渲染,不 agent 手写**
+中文模式 RENDER **走确定性脚本 `scripts/publish/render_zh.py`**,不要 agent 逐段手写 HTML(手写正是 L2/L3 render 回归的老病灶;渲染是机械填空,脚本字节级一致、零回归)。
+
+```bash
+python3 scripts/publish/render_zh.py \
+  --clean "$WORKDIR/clean.txt" --structure "$WORKDIR/structure.json" \
+  --raw "$WORKDIR/transcript.txt" --base skills/bpr/templates/base.html \
+  --meta "$WORKDIR/metadata.json" --out "$OUT.html"
+```
+- 输入:CLEAN 书面正文(turn 头 = `Speaker N HH:MM:SS` 独占行,见 clean.md 硬约束)+ STRUCTURE 的 JSON(hero/tldr/contrarian/chapters,含 `speakers` 映射)+ 火山原始底档。
+- 脚本自动:书面正文 `.turn`、每章末 `<details class="raw-transcript">` 折叠底档、`⟨?X⟩`→`<mark class="asr-uncertain">`、按时间戳分章、填 base.html 占位符。
+- agent 只负责 STRUCTURE(切章/TL;DR/非共识的"思考");拼装交脚本。
 
 ### 例外
 
