@@ -5,6 +5,17 @@ All notable changes to this plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.6.1 — 2026-07-23
+
+**ASR 源头优化 Round 2 + landing 排序恢复。** (spec: `docs/superpowers/specs/2026-07-23-asr-source-round2-design.md`)
+
+- **火山 ASR 迁 2.0(seedasr)裸跑**:2.0 传 `corpus.context` 会 55000001,故不传 context;基础字准更强(Anthropic/CoWork/scaling 零偏置即对)。env `VOLC_ASR_RESOURCE` 可回退 1.0。
+- **热词文件层**:2.0 实测接受 `corpus.boosting_table_name`(与 context 不同路径)→ 恢复为源头字准手段(`--boosting`/env `VOLC_ASR_BOOSTING`,火山自学习平台建表)。
+- **shownote → CLEAN**:`fetch_xiaoyuzhou.sh` 抓完整 shownote(不再只 og:desc[:500]);`clean.md` 的 Analyze/Review 读 shownote + podcast 名 + glossary 做专名纠错参考(shownote 是比 ASR 更可信的独立信源)。实测:Aultimate→Altimeter、小俊→小珺、阿帕比→Anthropic。
+- **glossary 定位**:从"ASR context 底料"改为"CLEAN 纠错词库"(`词|权重` 格式,多期 shownote 沉淀,CLEAN 读词忽略权重)。
+- **landing 排序恢复**(`build_index.py`):`内容时间`/`新增时间` 排序按钮 + `added-dates.json` 新增时间清单(Vercel birthtime 不可信,清单为准);扁平 `#entryList` + 客户端年份分隔。
+- e2e:Freda 投资札记第2集 全链路跑通(fetch→2.0+热词→CLEAN 35 agent→STRUCTURE→RENDER),成品发布 bpr.ken.solar。
+
 ## v1.6.0 — 2026-07-23
 
 **新增 CLEAN 阶段(ASR 后处理三步法)**,治火山 ASR 中文逐字稿两大硬伤:中英混录同音/近音错词 + 逐字口语可读性差。

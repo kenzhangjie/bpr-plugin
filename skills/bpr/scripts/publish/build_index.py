@@ -17,17 +17,45 @@ Idempotent. Safe to rerun anytime.
 """
 from __future__ import annotations
 
-import os
+import json
 import re
 import sys
 from datetime import date as _date
 from html import escape
 from pathlib import Path
 
-TRANSCRIPT_DIR = Path(os.environ.get("BPR_TRANSCRIPT_DIR", "~/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript")).expanduser()
-INDEX_PATH = TRANSCRIPT_DIR / "index.html"
+import os
+# Default: $TRANSCRIPT_DIR env var, then arg1, then cwd (allows running on Vercel).
+_default = os.environ.get("TRANSCRIPT_DIR") or os.getcwd()
+TRANSCRIPT_DIR = Path(sys.argv[1] if len(sys.argv) > 1 else _default).resolve()
+INDEX_PATH = Path(sys.argv[2]) if len(sys.argv) > 2 else TRANSCRIPT_DIR / "index.html"
 POSTERS_PATH = TRANSCRIPT_DIR / "posters.html"
 BASE_URL = "https://bpr.ken.solar"
+
+# "Added" ordering source of truth. The filename only carries the *content* date;
+# this manifest records when each entry was first added to the site. It must be
+# maintained LOCALLY (where file birthtimes are real) and shipped with the deploy —
+# on Vercel build the checkout birthtimes are bogus, so existing entries here are
+# authoritative and never overwritten. No leading dot, so `vercel --prod` uploads it.
+ADDED_MANIFEST = TRANSCRIPT_DIR / "added-dates.json"
+
+
+def load_added_manifest() -> dict:
+    try:
+        data = json.loads(ADDED_MANIFEST.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_added_manifest(manifest: dict) -> None:
+    try:
+        ADDED_MANIFEST.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except Exception as e:
+        print(f"WARN: could not write {ADDED_MANIFEST.name}: {e}", file=sys.stderr)
 
 FILENAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})_([^_]+)_(.+)\.html$")
 TAG_STRIP_RE = re.compile(r"<[^>]+>")
@@ -125,11 +153,30 @@ def parse_entry(path: Path) -> dict | None:
         text = path.read_text(encoding="utf-8", errors="replace")
     except Exception:
         return None
+    # File creation date — used to bootstrap the added-dates manifest for entries
+    # not yet recorded. Falls back to mtime, then the content date.
+    try:
+        st = path.stat()
+        birth_ts = getattr(st, "st_birthtime", None) or st.st_mtime
+        birth = _date.fromtimestamp(birth_ts).isoformat()
+    except Exception:
+        birth = iso
     stem = path.stem
-    poster = TRANSCRIPT_DIR / f"{stem}-poster.png"
-    poster_href = f"{stem}-poster.png" if poster.exists() else None
-    card = TRANSCRIPT_DIR / f"{stem}-card.png"
-    card_href = f"{stem}-card.png" if card.exists() else None
+    # If the file is in a subdir (e.g., bytedance/), capture the collection name.
+    # Top-level files have collection = "".
+    try:
+        rel_parent = path.parent.relative_to(TRANSCRIPT_DIR)
+        collection = str(rel_parent) if str(rel_parent) != "." else ""
+    except ValueError:
+        collection = ""
+    # Poster / card live alongside the .html, in the same dir.
+    poster_dir = path.parent
+    poster = poster_dir / f"{stem}-poster.png"
+    card = poster_dir / f"{stem}-card.png"
+    # href is relative to TRANSCRIPT_DIR root
+    href_prefix = f"{collection}/" if collection else ""
+    poster_href = f"{href_prefix}{stem}-poster.png" if poster.exists() else None
+    card_href = f"{href_prefix}{stem}-card.png" if card.exists() else None
 
     h1 = extract_h1_with_em(text) or rest.replace("-", " ").title()
     zh = extract_field(text, "hero-zh")
@@ -145,9 +192,11 @@ def parse_entry(path: Path) -> dict | None:
     return {
         "iso": iso,
         "year": iso[:4],
+        "birth": birth,
         "source": source,
         "rest": rest,
-        "href": path.name,
+        "href": f"{href_prefix}{path.name}",
+        "collection": collection,
         "poster_href": poster_href,
         "card_href": card_href,
         "tags": tags,
@@ -159,14 +208,36 @@ def parse_entry(path: Path) -> dict | None:
 
 def collect_entries() -> list[dict]:
     entries: list[dict] = []
-    for f in TRANSCRIPT_DIR.glob("*.html"):
+    # Scan top-level + one level deep subdirs (e.g., bytedance/*.html)
+    candidates = list(TRANSCRIPT_DIR.glob("*.html")) + list(TRANSCRIPT_DIR.glob("*/*.html"))
+    for f in candidates:
         if f.name in ("index.html", "posters.html"):
             continue
         if f.name.endswith("-poster.html"):
             continue
+        # Skip files in images/ or .vercel/ subdirs
+        if any(part in ("images", ".vercel", "node_modules") for part in f.parts):
+            continue
         e = parse_entry(f)
         if e:
             entries.append(e)
+
+    # Resolve each entry's "added" date from the manifest (source of truth).
+    # New entries (not yet recorded) are stamped with their file birthtime and
+    # persisted; existing records are never overwritten.
+    manifest = load_added_manifest()
+    changed = False
+    for e in entries:
+        key = e["href"]
+        if key in manifest:
+            e["added"] = manifest[key]
+        else:
+            e["added"] = e["birth"]
+            manifest[key] = e["added"]
+            changed = True
+    if changed:
+        save_added_manifest(manifest)
+
     entries.sort(key=lambda x: x["iso"], reverse=True)
     return entries
 
@@ -359,28 +430,71 @@ BASE_TOKENS = """
     }
 """
 
-TAG_FILTER_JS = """
+SORT_FILTER_JS = """
     (function(){
-      var filter=document.getElementById('tagFilter');
-      if(!filter)return;
-      var chips=filter.querySelectorAll('.tag-chip');
-      var entries=document.querySelectorAll('.entry');
-      var yearBlocks=document.querySelectorAll('.year-block');
-      function apply(tag){
-        chips.forEach(function(c){c.classList.toggle('active', c.dataset.tag===tag)});
-        entries.forEach(function(e){
-          var tags=(e.dataset.tags||'').split(/\\s+/);
-          var match = tag==='all' || tags.indexOf(tag)>-1;
-          e.classList.toggle('hidden', !match);
+      var list=document.getElementById('entryList');
+      if(!list)return;
+      var entries=Array.prototype.slice.call(list.querySelectorAll('.entry'));
+      var sortBtns=document.querySelectorAll('#sortToggle .sort-btn');
+      var chips=document.querySelectorAll('#tagFilter .tag-chip');
+      var state={sort:'iso', tag:'all'};
+
+      function makeSep(label){
+        var li=document.createElement('li');
+        li.className='period-sep';
+        li.setAttribute('data-period',label);
+        li.textContent=label;
+        return li;
+      }
+
+      function rebuild(){
+        var key = state.sort==='added' ? 'added' : 'iso';
+        var sorted = entries.slice().sort(function(a,b){
+          var av=a.getAttribute('data-'+key)||'', bv=b.getAttribute('data-'+key)||'';
+          return av<bv?1:(av>bv?-1:0);  // descending — newest first
         });
-        yearBlocks.forEach(function(yb){
-          var visible=yb.querySelectorAll('.entry:not(.hidden)').length;
-          yb.classList.toggle('empty', visible===0);
+        // drop existing separators, then re-lay-out in sorted order
+        var old=list.querySelectorAll('.period-sep');
+        for(var i=0;i<old.length;i++){old[i].remove();}
+        list.classList.toggle('by-added', state.sort==='added');
+        var curPeriod=null;
+        sorted.forEach(function(e){
+          var tags=(e.getAttribute('data-tags')||'').split(/\\s+/);
+          var visible = state.tag==='all' || tags.indexOf(state.tag)>-1;
+          e.classList.toggle('hidden', !visible);
+          // year separators only in content-time mode, before each visible year
+          if(state.sort==='iso' && visible){
+            var yr=e.getAttribute('data-year');
+            if(yr!==curPeriod){ curPeriod=yr; list.appendChild(makeSep(yr)); }
+          }
+          list.appendChild(e);
         });
       }
-      chips.forEach(function(c){
-        c.addEventListener('click',function(){apply(c.dataset.tag)});
+
+      sortBtns.forEach(function(b){
+        b.addEventListener('click',function(){
+          state.sort=b.getAttribute('data-sort');
+          sortBtns.forEach(function(x){x.classList.toggle('active',x===b);});
+          try{localStorage.setItem('bpr-sort',state.sort);}catch(e){}
+          rebuild();
+        });
       });
+      chips.forEach(function(c){
+        c.addEventListener('click',function(){
+          state.tag=c.dataset.tag;
+          chips.forEach(function(x){x.classList.toggle('active',x.dataset.tag===state.tag);});
+          rebuild();
+        });
+      });
+
+      try{
+        var saved=localStorage.getItem('bpr-sort');
+        if(saved==='added'||saved==='iso'){
+          state.sort=saved;
+          sortBtns.forEach(function(x){x.classList.toggle('active',x.getAttribute('data-sort')===saved);});
+        }
+      }catch(e){}
+      rebuild();
     })();"""
 
 THEME_TOGGLE_JS = """
@@ -435,6 +549,7 @@ def render_entry_li(e: dict) -> str:
     source_tag = escape(e["source"])
     tags = e.get("tags", [])
     tags_attr = " ".join(tags)
+    collection = e.get("collection", "")
     has_poster = bool(e.get("poster_href"))
     poster_href = escape(e["poster_href"]) if has_poster else ""
     cls = "entry has-poster" if has_poster else "entry"
@@ -452,10 +567,17 @@ def render_entry_li(e: dict) -> str:
         tag_spans = " ".join(f'<span class="entry-tag">{escape(t)}</span>' for t in tags)
         tags_html = f'<div class="entry-tags">{tag_spans}</div>'
 
-    return f"""<li class="{cls}" data-tags="{escape(tags_attr)}">
-  <div class="entry-date">{pretty_date}</div>
+    collection_html = ""
+    if collection:
+        collection_html = f'<span class="entry-collection">📁 {escape(collection)}</span>'
+
+    added = e.get("added", "")
+    added_html = f'<div class="entry-added">+ {escape(added)}</div>' if added else ""
+
+    return f"""<li class="{cls}" data-tags="{escape(tags_attr)}" data-collection="{escape(collection)}" data-iso="{iso}" data-added="{escape(added)}" data-year="{iso[:4]}">
+  <div class="entry-date">{pretty_date}{added_html}</div>
   <div class="entry-body">
-    <div class="entry-source">{source_tag}</div>
+    <div class="entry-source">{source_tag} {collection_html}</div>
     <a class="entry-h1-link" href="{href}"><h3 class="entry-h1">{h1_html}</h3></a>
     {f'<div class="entry-zh">{zh}</div>' if zh else ''}
     {f'<div class="entry-eyebrow">{eyebrow}</div>' if eyebrow else ''}
@@ -466,23 +588,26 @@ def render_entry_li(e: dict) -> str:
 
 def render_index(entries: list[dict]) -> str:
     today = _date.today().isoformat()
-    by_year: dict[str, list[dict]] = {}
-    for e in entries:
-        by_year.setdefault(e["year"], []).append(e)
-    years_sorted = sorted(by_year.keys(), reverse=True)
 
-    sections_html = []
-    for y in years_sorted:
-        items = "\n".join(render_entry_li(e) for e in by_year[y])
-        sections_html.append(
-            f'<section class="year-block">\n'
-            f'  <h2 class="year">{y}</h2>\n'
-            f'  <ul class="entries">\n{items}\n  </ul>\n'
-            f'</section>'
-        )
-    sections = "\n\n".join(sections_html)
+    # Single flat list. Server renders in original/content order (iso desc) with
+    # year separators, so the page reads correctly with no JS. The sort toggle
+    # re-orders client-side ("added" mode flattens — no separators).
+    list_items: list[str] = []
+    cur_year: str | None = None
+    for e in entries:  # already iso desc
+        if e["year"] != cur_year:
+            cur_year = e["year"]
+            list_items.append(
+                f'<li class="period-sep" data-period="{cur_year}">{cur_year}</li>'
+            )
+        list_items.append(render_entry_li(e))
+    entry_list = "\n".join(list_items)
     count = len(entries)
     poster_count = sum(1 for e in entries if e.get("poster_href"))
+    # posters gallery is generated only when at least one poster exists;
+    # with zero posters the nav link and stat are suppressed (see main()).
+    posters_nav = '<div class="top-nav"><a href="posters.html">Posters →</a></div>' if poster_count else ""
+    posters_stat = f'<div><strong>含海报</strong><a href="posters.html">{poster_count} 张 →</a></div>' if poster_count else ""
 
     # build tag filter chips — count entries per tag, only show tags with >=1
     tag_counts: dict[str, int] = {}
@@ -570,14 +695,17 @@ def render_index(entries: list[dict]) -> str:
     }}
     .meta-bar strong{{color:var(--ink-soft); font-weight:500; margin-right:6px}}
 
-    .year-block{{margin:72px 0}}
-    .year{{
+    .entries{{list-style:none; margin:0; padding:0}}
+    /* year separator — a list item acting as the period header, so the whole
+       list can be re-sorted client-side without nested section wrappers */
+    .period-sep{{
+      list-style:none;
       font-family:var(--serif-en); font-weight:500;
       font-size:14px; letter-spacing:.4em;
-      color:var(--accent); margin:0 0 36px;
+      color:var(--accent); margin:56px 0 28px;
       padding-bottom:16px; border-bottom:1px solid var(--rule);
     }}
-    .entries{{list-style:none; margin:0; padding:0}}
+    .period-sep:first-child{{margin-top:0}}
     .entry{{
       margin:0;
       display:grid;
@@ -599,12 +727,30 @@ def render_index(entries: list[dict]) -> str:
       font-family:var(--sans); font-size:12px; letter-spacing:.1em;
       color:var(--ink-faint); padding-top:6px;
     }}
+    /* "added" date — hidden until the list is sorted by added time */
+    .entry-added{{
+      display:none;
+      font-family:var(--sans); font-size:11px; letter-spacing:.04em;
+      color:var(--accent-soft); margin-top:5px;
+    }}
+    #entryList.by-added .entry-added{{display:block}}
     .entry-source{{
       display:inline-block;
       font-family:var(--sans); font-size:10px; font-weight:500;
       letter-spacing:.18em; text-transform:uppercase;
       color:var(--accent-soft);
       margin-bottom:8px;
+    }}
+    .entry-collection{{
+      display:inline-block;
+      margin-left:8px;
+      padding:1px 8px;
+      font-family:var(--sans); font-size:10px; font-weight:500;
+      letter-spacing:.06em; text-transform:none;
+      color:var(--accent);
+      background:rgba(176,74,47,0.08);
+      border:1px solid rgba(176,74,47,0.2);
+      border-radius:3px;
     }}
     .entry-h1-link{{display:block}}
     .entry-h1{{
@@ -689,10 +835,34 @@ def render_index(entries: list[dict]) -> str:
     }}
     .tag-chip.active em{{ color:var(--accent-soft) }}
 
+    /* sort toggle — same editorial language as the tag filter */
+    .sort-toggle{{
+      margin:-24px 0 48px;
+      display:flex; align-items:baseline; gap:18px; flex-wrap:wrap;
+    }}
+    .sort-toggle-label{{
+      font-family:var(--sans); font-size:10px;
+      letter-spacing:.22em; text-transform:uppercase;
+      color:var(--ink-faint);
+    }}
+    .sort-btns{{display:flex; gap:0; align-items:baseline}}
+    .sort-btn{{
+      font-family:var(--sans); font-size:11px;
+      color:var(--ink-soft); background:transparent;
+      padding:4px 10px;
+      border:0; border-radius:0;
+      cursor:pointer; transition:color .15s, border-color .15s;
+      letter-spacing:.18em; text-transform:uppercase;
+      border-bottom:1px solid transparent;
+    }}
+    .sort-btn:hover{{ color:var(--accent) }}
+    .sort-btn.active{{
+      color:var(--accent);
+      border-bottom-color:var(--accent);
+    }}
+
     /* hide entries that don't match selected tag */
     .entry.hidden{{ display:none }}
-    /* hide year blocks with all entries hidden */
-    .year-block.empty{{ display:none }}
     .entry-poster{{
       position:relative; display:block;
       width:110px; height:150px;
@@ -740,7 +910,7 @@ def render_index(entries: list[dict]) -> str:
 <body>
 
   <button class="theme-toggle" aria-label="切换主题">◐</button>
-  <div class="top-nav"><a href="posters.html">Posters →</a></div>
+  {posters_nav}
 
   <div class="container">
 
@@ -763,13 +933,13 @@ def render_index(entries: list[dict]) -> str:
       <div class="hero-zh">双语阅读日志 · Editorial-grade Bilingual Reader</div>
       <div class="lede">
         <p>把高密度的英文播客与长文,慢慢嚼成<em>可以重复读</em>的双语版本。</p>
-        <p>每一篇都跑一遍 <em>Translate → Reflect → Improve</em> 三步法翻译,然后用印刷品级的字体排版,做成单文件 HTML。</p>
+        <p>每一篇都跑一遍 <em>Analyze → Translate → Review → Polish</em> 四步法翻译,然后用印刷品级的字体排版,做成单文件 HTML。</p>
         <p>不为快,只为耐心读者。</p>
       </div>
       <div class="tagline">Slow reading for the AI era.</div>
       <div class="meta-bar">
         <div><strong>已收录</strong>{count} 篇</div>
-        <div><strong>含海报</strong><a href="posters.html">{poster_count} 张 →</a></div>
+        {posters_stat}
         <div><strong>更新</strong>{today}</div>
         <div><strong>站点</strong><a href="https://ken.solar">ken.solar</a></div>
       </div>
@@ -782,7 +952,17 @@ def render_index(entries: list[dict]) -> str:
       </div>
     </div>
 
-{sections}
+    <div class="sort-toggle" id="sortToggle">
+      <div class="sort-toggle-label">SORT · 排序</div>
+      <div class="sort-btns">
+        <button class="sort-btn active" data-sort="iso">内容时间</button>
+        <button class="sort-btn" data-sort="added">新增时间</button>
+      </div>
+    </div>
+
+    <ul class="entries" id="entryList">
+{entry_list}
+    </ul>
 
     <footer>
       <div>by <strong style="color:var(--ink-soft)">ken</strong> · built with <code style="font-family:ui-monospace,Menlo,monospace;background:rgba(176,74,47,.08);padding:1px 6px;border-radius:4px;color:var(--accent)">/bpr</code></div>
@@ -792,8 +972,9 @@ def render_index(entries: list[dict]) -> str:
   </div>
 {LIGHTBOX_HTML}
 
-  <script>{THEME_TOGGLE_JS}{LIGHTBOX_JS}{TAG_FILTER_JS}</script>
+  <script>{THEME_TOGGLE_JS}{LIGHTBOX_JS}{SORT_FILTER_JS}</script>
 
+<script src="https://mark.ken.solar/embed.js?v=1" defer></script>
 </body>
 </html>
 """
@@ -1011,6 +1192,7 @@ def render_posters_page(entries: list[dict]) -> str:
 
   <script>{THEME_TOGGLE_JS}{LIGHTBOX_JS}</script>
 
+<script src="https://mark.ken.solar/embed.js?v=1" defer></script>
 </body>
 </html>
 """
@@ -1028,12 +1210,19 @@ def main() -> int:
         if p.exists():
             p.unlink()
 
-    INDEX_PATH.write_text(render_index(entries), encoding="utf-8")
-    POSTERS_PATH.write_text(render_posters_page(entries), encoding="utf-8")
-
     poster_count = sum(1 for e in entries if e.get("poster_href"))
+
+    INDEX_PATH.write_text(render_index(entries), encoding="utf-8")
     print(f"✓ index.html   ({INDEX_PATH.stat().st_size:,} bytes, {len(entries)} entries)")
-    print(f"✓ posters.html ({POSTERS_PATH.stat().st_size:,} bytes, {poster_count} posters)")
+
+    # posters.html only when at least one poster exists; else drop any leftover
+    if poster_count:
+        POSTERS_PATH.write_text(render_posters_page(entries), encoding="utf-8")
+        print(f"✓ posters.html ({POSTERS_PATH.stat().st_size:,} bytes, {poster_count} posters)")
+    else:
+        if POSTERS_PATH.exists():
+            POSTERS_PATH.unlink()
+        print("· posters.html skipped (0 posters)")
     return 0
 
 

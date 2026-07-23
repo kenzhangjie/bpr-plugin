@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Bilingual Podcast Reader — turn English podcasts/essays into editorial-style bilingual HTML; auto-detect Chinese and switch to TL;DR + 非共识 + chapter-summary mode. Supports YouTube / 小宇宙 / Bilibili.",
-    "version": "1.6.0"
+    "version": "1.6.1"
   },
   "plugins": [
     {
       "name": "bpr",
       "source": "./",
       "description": "把 podcast/transcript/字幕/博客 essay 转成编辑设计风格的阅读 HTML。英文双语,中文 TL;DR+非共识+章节回顾。支持 YouTube/小宇宙/Bilibili 输入",
-      "version": "1.6.0",
+      "version": "1.6.1",
       "author": {
         "name": "kenzhangjie",
         "email": "ken.zhangjie@gmail.com"
