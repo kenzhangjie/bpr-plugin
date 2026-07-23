@@ -1,6 +1,6 @@
 # RENDER · 版型 / TL;DR / inline link / 双语对照 / 图自托管 / 设计系统
 
-> 阶段 5 · RENDER 专用。用 `templates/base.html` 骨架建页(双语对照 / essay / 中文逐字三种版型);`enrich` 子动作 = essay 正文图自托管 + podcast 时间戳。CSS/DOM 完整代码全在 `templates/base.html`,直接 copy,不要重写。
+> 阶段 6 · RENDER 专用。用 `templates/base.html` 骨架建页(双语对照 / essay / 中文书面正文+可折叠底档 三种版型);`enrich` 子动作 = essay 正文图自托管 + podcast 时间戳。CSS/DOM 完整代码全在 `templates/base.html`,直接 copy,不要重写。
 
 ---
 

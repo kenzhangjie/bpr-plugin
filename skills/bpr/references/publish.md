@@ -1,6 +1,6 @@
 # PUBLISH · 产物约定 / landing index / 部署
 
-> 阶段 7 · PUBLISH 专用。重建 landing index → 部署 bpr.ken.solar(proxy 直连)。
+> 阶段 8 · PUBLISH 专用。重建 landing index → 部署 bpr.ken.solar(proxy 直连)。
 
 ---
 

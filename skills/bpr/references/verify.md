@@ -23,6 +23,7 @@
 英文双语模式仍用句数闸(不变)。
 
 - [ ] **CLEAN 冒烟**:跑 `tests/fixtures/asr-clean-regression.md`,4 个错词须全修对。
+- [ ] **零幻觉抽查**:抽查渲染里的 `<mark class="asr-uncertain">` 标注,确认是"存疑标注"而非模型杜撰的答案(见 clean.md Step E)。
 
 ## 来源行(hero-meta,必填 — 见 SKILL.md "来源行")
 

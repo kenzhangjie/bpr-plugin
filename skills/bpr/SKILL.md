@@ -22,8 +22,8 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 | **3 · CLEAN** | **(仅中文模式)** ASR 后处理三步:Analyze 全稿定术语表+存疑清单 → 按 ~25 turn 切窗,子代理 Review(纠错)+ Polish(书面化)→ 产出书面正文,保留逐字底档。英文模式跳过。 | `references/clean.md` |
 | **4 · STRUCTURE** | 章节切分 + 提炼 TL;DR(描述性 h2)+(中文模式)🔥 非共识 takes。规模按下方"自适应"表。 | `references/render.md`(TL;DR 4 元素 / 中文 2 元素格式)· 下方自适应表 |
 | **5 · TRANSLATE** | **仅英文双语模式**跑。逐句翻译走**四步法** + 逐字全覆盖 + 中文去口语词(两条硬约束)。中文模式跳过。 | **`references/translate.md`(必读:四步法 + 逐字 + 去口语词)** |
-| **6 · RENDER** | 用 `templates/base.html` 骨架建 HTML(双语对照 / essay / 中文逐字三种版型)。`enrich` 子动作:essay 跑正文图自托管、podcast 注入时间戳。 | `references/render.md`(版型 / inline link / hero-meta 来源行)· `scripts/enrich/{extract_images,add_timestamps}.py` |
-| **7 · VERIFY** | 质量自检 + **覆盖率硬闸**(渲染句数 ÷ 源稿 <~85% 回 TRANSLATE 补;不止查 en=zh 配对)。 | `references/verify.md` |
+| **6 · RENDER** | 用 `templates/base.html` 骨架建 HTML(双语对照 / essay / 中文书面正文+可折叠底档 三种版型)。`enrich` 子动作:essay 跑正文图自托管、podcast 注入时间戳。 | `references/render.md`(版型 / inline link / hero-meta 来源行)· `scripts/enrich/{extract_images,add_timestamps}.py` |
+| **7 · VERIFY** | 质量自检:英文双语走句数覆盖闸(不足回 TRANSLATE 补);中文 CLEAN 走实体覆盖闸(不足回 CLEAN 补)。详见 verify.md。 | `references/verify.md` |
 | **8 · PUBLISH** | 重建 landing index → 部署 bpr.ken.solar(proxy 直连)。 | `references/publish.md`(产物约定 + 部署)· `scripts/publish/build_index.py` |
 
 **海报(可选分支)**:命令以 `/bpr all` 开头时,在 RENDER 后追加一步出 hidpi PNG。详见 `references/poster.md` · `scripts/poster/crop_and_share.py`。
