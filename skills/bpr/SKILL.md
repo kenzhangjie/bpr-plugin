@@ -18,7 +18,7 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 | 阶段 | 做什么 | 读哪个 reference / 用哪个脚本 |
 |---|---|---|
 | **1 · INGEST** | 解析输入:URL 预处理 + 提取发布日期/标题/作者;判输入类型(SRT / 带时间戳 transcript / 纯文本 transcript / blog essay)。文件名也在此阶段按元信息定。 | `references/ingest.md`(URL 处理 / 发布日期 / 文件名规则)· `scripts/fetch/*` |
-| **2 · PREP** | 预处理:合并跨条句、提取说话人、标注时间戳、auto-subs 重断句+加标点、VTT 滚动重建;**统计 CJK 占比 → 选模式**(≥60% 中文浓缩 / <60% 英文双语)。 | `references/prep-and-modes.md`(断句 + 中文模式判定与规范)· `scripts/fetch/clean_vtt.py` |
+| **2 · PREP** | 预处理:合并跨条句、提取说话人、标注时间戳、auto-subs 重断句+加标点、VTT 滚动重建;**统计 CJK 占比 → 选模式**(≥60% 中文浓缩 / <60% 英文双语)。**英文子模式**:用 `description` 当 ground truth 做专名纠错 + 说话人归属 + 拆合并 `>>`(见 prep-and-modes.md);中文走 CLEAN。 | `references/prep-and-modes.md`(断句 + 中文模式判定与规范)· `scripts/fetch/clean_vtt.py` |
 | **3 · CLEAN** | **(仅中文模式)** ASR 后处理三步:Analyze 全稿定术语表+存疑清单 → 按 ~25 turn 切窗,子代理 Review(纠错)+ Polish(书面化)→ 产出书面正文,保留逐字底档。英文模式跳过。 | `references/clean.md` |
 | **4 · STRUCTURE** | 章节切分 + 提炼 TL;DR(描述性 h2)+(中文模式)🔥 非共识 takes。规模按下方"自适应"表。 | `references/render.md`(TL;DR 4 元素 / 中文 2 元素格式)· 下方自适应表 |
 | **5 · TRANSLATE** | **仅英文双语模式**跑。逐句翻译走**四步法** + 逐字全覆盖 + 中文去口语词(两条硬约束)。中文模式跳过。 | **`references/translate.md`(必读:四步法 + 逐字 + 去口语词)** |
