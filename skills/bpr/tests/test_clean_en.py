@@ -46,3 +46,20 @@ def test_word_coverage_detects_drop():
 
 def test_word_coverage_ignores_case_and_punct():
     assert ce.word_coverage("Hello, world!", "hello world") == 1.0
+
+
+def test_append_glossary_dedups_and_appends(tmp_path):
+    g = tmp_path / "glossary.txt"
+    g.write_text("OpenAI|6\nClaude|7\n", encoding="utf-8")
+    added = ce.append_glossary(["openai", "Codex", "Anthropic"], str(g))
+    assert added == 2  # openai 已存在(大小写不敏感),Codex/Anthropic 新增
+    lines = g.read_text(encoding="utf-8").splitlines()
+    assert "OpenAI|6" in lines and "Claude|7" in lines
+    assert "Codex|5" in lines and "Anthropic|5" in lines
+
+
+def test_append_glossary_creates_file(tmp_path):
+    g = tmp_path / "new.txt"
+    added = ce.append_glossary(["Vercel"], str(g))
+    assert added == 1
+    assert g.read_text(encoding="utf-8").strip() == "Vercel|5"

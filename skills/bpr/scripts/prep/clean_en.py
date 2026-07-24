@@ -5,7 +5,7 @@
 docs/superpowers/specs/2026-07-24-bpr-english-prep-correction-design.md。
 """
 from __future__ import annotations
-import html, re, json
+import html, re, json, os
 from collections import Counter
 
 
@@ -61,3 +61,24 @@ def word_coverage(src: str, out: str) -> float:
         return 1.0
     covered = sum(min(n, oc.get(w, 0)) for w, n in sc.items())
     return covered / total
+
+
+def append_glossary(names: list, path: str, default_weight: int = 5) -> int:
+    """新专名去重后 append 进共用 glossary.txt(格式 name|weight)。返回新增条数。"""
+    existing = {}
+    if os.path.exists(path):
+        for line in open(path, encoding="utf-8"):
+            term = line.strip().split("|", 1)[0]
+            if term:
+                existing[term.lower()] = True
+    added = []
+    for n in names:
+        n = n.strip()
+        if n and n.lower() not in existing:
+            existing[n.lower()] = True
+            added.append(n)
+    if added:
+        with open(path, "a", encoding="utf-8") as f:
+            for n in added:
+                f.write(f"{n}|{default_weight}\n")
+    return len(added)
