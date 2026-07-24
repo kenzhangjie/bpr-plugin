@@ -32,3 +32,17 @@ def test_apply_correct_table_bilingual():
 
 def test_apply_correct_table_noop_when_no_match():
     assert ce.apply_correct_table("nothing here", {"X": "Y"}) == "nothing here"
+
+
+def test_word_coverage_full():
+    assert ce.word_coverage("OpenAI makes Codex", "OpenAI makes Codex") == 1.0
+
+
+def test_word_coverage_detects_drop():
+    # 输出丢了一整句 → 覆盖明显 < 1
+    cov = ce.word_coverage("a b c d e f g h i j", "a b c d e")
+    assert cov == 0.5
+
+
+def test_word_coverage_ignores_case_and_punct():
+    assert ce.word_coverage("Hello, world!", "hello world") == 1.0

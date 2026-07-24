@@ -6,6 +6,7 @@ docs/superpowers/specs/2026-07-24-bpr-english-prep-correction-design.md。
 """
 from __future__ import annotations
 import html, re, json
+from collections import Counter
 
 
 def parse_blocks(raw: str) -> list[str]:
@@ -44,3 +45,19 @@ def apply_correct_table(text: str, mappings: dict) -> str:
             i += 1
 
     return ''.join(result)
+
+
+def norm_words(s: str) -> list[str]:
+    s = html.unescape(s).lower()
+    s = re.sub(r"[^a-z0-9 ]", " ", s)
+    return s.split()
+
+
+def word_coverage(src: str, out: str) -> float:
+    """源词多重集被输出覆盖的比例。丢句 → 比例下降。1.0 = 全覆盖。"""
+    sc, oc = Counter(norm_words(src)), Counter(norm_words(out))
+    total = sum(sc.values())
+    if total == 0:
+        return 1.0
+    covered = sum(min(n, oc.get(w, 0)) for w, n in sc.items())
+    return covered / total
