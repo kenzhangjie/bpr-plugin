@@ -66,27 +66,27 @@ def word_coverage(src: str, out: str) -> float:
 def append_glossary(names: list, path: str, default_weight: int = 5) -> int:
     """新专名去重后 append 进共用 glossary.txt(格式 name|weight)。返回新增条数。"""
     existing = {}
+    needs_leading_newline = False
+
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
-            for line in f:
+            content = f.read()
+            # Build dedup set from single read
+            for line in content.split('\n'):
                 term = line.strip().split("|", 1)[0]
                 if term:
                     existing[term.lower()] = True
+            # Check if file ends with newline
+            needs_leading_newline = content and not content.endswith("\n")
+
     added = []
     for n in names:
         n = n.strip()
         if n and n.lower() not in existing:
             existing[n.lower()] = True
             added.append(n)
-    if added:
-        # Ensure file ends with \n before appending to prevent merging with last line
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                content = f.read()
-                needs_leading_newline = content and not content.endswith("\n")
-        else:
-            needs_leading_newline = False
 
+    if added:
         with open(path, "a", encoding="utf-8") as f:
             if needs_leading_newline:
                 f.write("\n")

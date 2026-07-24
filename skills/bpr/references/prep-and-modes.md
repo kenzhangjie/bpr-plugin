@@ -19,7 +19,7 @@ YouTube 只拿到 auto-subs(无标点、无 speaker)时,PREP 先做退化处理�
 > 设计文档:`docs/superpowers/specs/2026-07-24-bpr-english-prep-correction-design.md`。解决 2026-07-24 Lenny × Andrew Ambrosino 那期实测暴露的两个痛——YT 自动字幕专名错听(OpenAI→"Opening Eye"、Codex→"Codeex")、说话人归属靠手拆——过去全靠手写 regex + 人肉判断,这节把它变成可重复的 agent 流程。
 
 ### 触发条件
-**CJK < 60%**(判定见上"语言检测算法")且输入是 **transcript 类**(有 `>>` 或 speaker 信号)。**essay(单作者、无说话人轮换的博客/长文)跳过本节**,直接走原有 PREP 流程。
+**CJK < 60%**(判定见下「语言检测算法」)且输入是 **transcript 类**(有 `>>` 或 speaker 信号)。**essay(单作者、无说话人轮换的博客/长文)跳过本节**,直接走原有 PREP 流程。
 
 对应脚本:`scripts/prep/clean_en.py`(`parse_blocks` / `split_windows` / `load_mappings` / `apply_correct_table` / `norm_words` / `word_coverage` / `append_glossary` / `finalize` + CLI)。**中文专名纠错走 `clean.md` 的 CLEAN 三步法,英文不跑那套(不书面化,逐字交 TRANSLATE)**——两条源清洗路径平行、互不调用。
 
@@ -71,7 +71,7 @@ python3 scripts/prep/clean_en.py \
   --names <本期专名清单 JSON,可选,回写 glossary>
 ```
 
-CLI 内部调用 `finalize(turns, raw, mappings)`:对每句套 `apply_correct_table`,再用 `word_coverage` 算整体覆盖率。**覆盖率 < 0.98 视为丢句**——CLI 以非零退出码 + `WARN` 提示打回,**主代理需把该窗打回 Step 2 重派一次**;重做仍不过,该处标 `⟨?丢失⟩` 留人工,不无限重试。这是把"英文 verbatim"从软约束升级成硬闸。
+CLI 内部调用 `finalize(turns, raw, mappings)`:对每句套 `apply_correct_table`,再用 `word_coverage` 算整体覆盖率。**覆盖率 < 0.98 视为丢句**——CLI 以非零退出码 + `WARN` 提示打回,**主代理需把该窗打回 Step 2 重派一次**;重做仍不过,该处标 `⟨?丢失⟩` 留人工,不无限重试。这是把"英文 verbatim"从软约束升级成硬闸。当 LLM 纠正了一个尚未进 `correct_table` 的专名时,词覆盖可能略降(该专名变体只在源侧);这属正常,别无限重派——沿用既有的"标 `⟨?丢失⟩` 留人工"逃生口。
 
 ### Step 4 · 确定性后处理 + 专名飞轮
 `finalize` 已经在拼装时自动套用了双语 `correct_table.json`(`load_mappings` 读入、`apply_correct_table` 无歧义硬映射补遗漏;长键优先避免短键抢先命中长专名)。**英文由这一步套用,不跑 `volc_asr.py`**(那是中文专用)。
