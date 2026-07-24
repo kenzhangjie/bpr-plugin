@@ -17,3 +17,18 @@ def test_split_windows_chunks_by_size():
     blocks = [str(i) for i in range(53)]
     w = ce.split_windows(blocks, size=25)
     assert [len(x) for x in w] == [25, 25, 3]
+
+
+def test_apply_correct_table_longest_key_first():
+    m = {"Hockey Stick": "X", "Hockey Sticky Gross": "Hockey Stick Growth"}
+    assert ce.apply_correct_table("we saw Hockey Sticky Gross here",
+                                  m) == "we saw Hockey Stick Growth here"
+
+
+def test_apply_correct_table_bilingual():
+    m = {"Opening Eye": "OpenAI", "克洛蔻": "Claude"}
+    assert ce.apply_correct_table("克洛蔻 vs Opening Eye", m) == "Claude vs OpenAI"
+
+
+def test_apply_correct_table_noop_when_no_match():
+    assert ce.apply_correct_table("nothing here", {"X": "Y"}) == "nothing here"
