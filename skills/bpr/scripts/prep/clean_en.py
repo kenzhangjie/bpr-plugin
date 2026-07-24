@@ -5,7 +5,7 @@
 docs/superpowers/specs/2026-07-24-bpr-english-prep-correction-design.md。
 """
 from __future__ import annotations
-import html, re, json, os
+import html, re, json, os, argparse, sys
 from collections import Counter
 
 
@@ -93,3 +93,48 @@ def append_glossary(names: list, path: str, default_weight: int = 5) -> int:
             for n in added:
                 f.write(f"{n}|{default_weight}\n")
     return len(added)
+
+
+def finalize(turns: list, raw: str, mappings: dict, gate: float = 0.98) -> dict:
+    """对每句套 apply_correct_table;整体算 word_coverage。返回 {"turns":[...], "coverage": float, "ok": bool}。"""
+    out_turns = []
+    for t in turns:
+        out_turns.append({
+            "speaker": t["speaker"],
+            "sents": [apply_correct_table(s, mappings) for s in t["sents"]],
+        })
+    joined = " ".join(s for t in out_turns for s in t["sents"])
+    cov = word_coverage(raw, joined)
+    return {"turns": out_turns, "coverage": cov, "ok": cov >= gate}
+
+
+def _main(argv=None) -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--turns", required=True, help="拼好的 turns JSON")
+    ap.add_argument("--raw", required=True, help="原始逐字稿(算覆盖用)")
+    ap.add_argument("--correct-table",
+                    default=os.path.expanduser("~/.config/volc/correct_table.json"))
+    ap.add_argument("--glossary",
+                    default=os.path.expanduser("~/.config/volc/glossary.txt"))
+    ap.add_argument("--names", help="本期专名清单 JSON(list),用于回写 glossary")
+    ap.add_argument("--out", required=True)
+    a = ap.parse_args(argv)
+
+    turns = json.load(open(a.turns, encoding="utf-8"))
+    raw = open(a.raw, encoding="utf-8").read()
+    mappings = load_mappings(a.correct_table) if os.path.exists(a.correct_table) else {}
+    res = finalize(turns, raw, mappings)
+    json.dump(res["turns"], open(a.out, "w", encoding="utf-8"),
+              ensure_ascii=False, indent=1)
+    if a.names and os.path.exists(a.names):
+        added = append_glossary(json.load(open(a.names, encoding="utf-8")), a.glossary)
+        print(f"glossary += {added}")
+    print(f"coverage {res['coverage']:.3f}  ok={res['ok']}")
+    if not res["ok"]:
+        print("WARN: 词覆盖 < 0.98,疑似丢句,回 Step 2 重派该窗", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

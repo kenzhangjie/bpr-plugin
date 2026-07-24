@@ -74,3 +74,22 @@ def test_append_glossary_handles_missing_trailing_newline(tmp_path):
     lines = g.read_text(encoding="utf-8").splitlines()
     assert "Claude|7" in lines and "Codex|5" in lines
     # Regression: if missing newline bug exists, we'd see "Claude|7Codex|5" as one line
+
+
+def test_finalize_applies_table_and_reports_coverage():
+    turns = [{"speaker": "Lenny", "sents": ["Opening Eye ships Codeex."]},
+             {"speaker": "Andrew", "sents": ["Yeah, Codeex is great."]}]
+    raw = "OpenAI ships Codex. >> Yeah, Codex is great."
+    m = {"Opening Eye": "OpenAI", "Codeex": "Codex"}
+    r = ce.finalize(turns, raw, m)
+    assert r["turns"][0]["sents"][0] == "OpenAI ships Codex."
+    assert r["turns"][1]["sents"][0] == "Yeah, Codex is great."
+    assert r["ok"] is True and r["coverage"] >= 0.98
+
+
+def test_finalize_flags_dropped_content():
+    turns = [{"speaker": "Lenny", "sents": ["only one sentence kept"]}]
+    raw = ("only one sentence kept >> a whole second turn that the agent "
+           "dropped entirely with many distinct words here")
+    r = ce.finalize(turns, raw, {})
+    assert r["ok"] is False and r["coverage"] < 0.98
