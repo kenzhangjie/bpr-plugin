@@ -93,3 +93,19 @@ def test_finalize_flags_dropped_content():
            "dropped entirely with many distinct words here")
     r = ce.finalize(turns, raw, {})
     assert r["ok"] is False and r["coverage"] < 0.98
+
+
+def test_finalize_proper_noun_correction_does_not_lower_coverage():
+    # Regression: proper noun corrections should not artificially lower coverage.
+    # The sub-agent has already corrected the turns output ("OpenAI", "Ambrosino", "Codex"),
+    # but raw source has uncorrected variants ("Opening Eye", "Ambercino", "Codeex").
+    # Before fix: word_coverage(raw_uncorrected, joined_corrected) would falsely report coverage < 0.98
+    # After fix: canonicalize raw through mappings so proper-noun variants collapse before comparison.
+    turns = [
+        {"speaker": "Lenny", "sents": ["90% at OpenAI use Codex."]},
+        {"speaker": "Andrew", "sents": ["Yeah, Ambrosino leads Codex."]}
+    ]
+    raw = "90% at Opening Eye use Codeex. >> Yeah, Ambercino leads Codeex."
+    mappings = {"Opening Eye": "OpenAI", "Codeex": "Codex", "Ambercino": "Ambrosino"}
+    r = ce.finalize(turns, raw, mappings)
+    assert r["ok"] is True and r["coverage"] >= 0.98

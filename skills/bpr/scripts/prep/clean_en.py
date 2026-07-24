@@ -104,7 +104,7 @@ def finalize(turns: list, raw: str, mappings: dict, gate: float = 0.98) -> dict:
             "sents": [apply_correct_table(s, mappings) for s in t["sents"]],
         })
     joined = " ".join(s for t in out_turns for s in t["sents"])
-    cov = word_coverage(raw, joined)
+    cov = word_coverage(apply_correct_table(raw, mappings), joined)
     return {"turns": out_turns, "coverage": cov, "ok": cov >= gate}
 
 
