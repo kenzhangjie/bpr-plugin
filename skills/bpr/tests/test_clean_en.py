@@ -63,3 +63,14 @@ def test_append_glossary_creates_file(tmp_path):
     added = ce.append_glossary(["Vercel"], str(g))
     assert added == 1
     assert g.read_text(encoding="utf-8").strip() == "Vercel|5"
+
+
+def test_append_glossary_handles_missing_trailing_newline(tmp_path):
+    g = tmp_path / "glossary.txt"
+    # Write without trailing newline — tests the corruption bug
+    g.write_bytes(b"OpenAI|6\nClaude|7")
+    added = ce.append_glossary(["Codex"], str(g))
+    assert added == 1
+    lines = g.read_text(encoding="utf-8").splitlines()
+    assert "Claude|7" in lines and "Codex|5" in lines
+    # Regression: if missing newline bug exists, we'd see "Claude|7Codex|5" as one line

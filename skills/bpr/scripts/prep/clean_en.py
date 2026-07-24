@@ -67,10 +67,11 @@ def append_glossary(names: list, path: str, default_weight: int = 5) -> int:
     """新专名去重后 append 进共用 glossary.txt(格式 name|weight)。返回新增条数。"""
     existing = {}
     if os.path.exists(path):
-        for line in open(path, encoding="utf-8"):
-            term = line.strip().split("|", 1)[0]
-            if term:
-                existing[term.lower()] = True
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                term = line.strip().split("|", 1)[0]
+                if term:
+                    existing[term.lower()] = True
     added = []
     for n in names:
         n = n.strip()
@@ -78,7 +79,17 @@ def append_glossary(names: list, path: str, default_weight: int = 5) -> int:
             existing[n.lower()] = True
             added.append(n)
     if added:
+        # Ensure file ends with \n before appending to prevent merging with last line
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+                needs_leading_newline = content and not content.endswith("\n")
+        else:
+            needs_leading_newline = False
+
         with open(path, "a", encoding="utf-8") as f:
+            if needs_leading_newline:
+                f.write("\n")
             for n in added:
                 f.write(f"{n}|{default_weight}\n")
     return len(added)
