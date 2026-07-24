@@ -15,6 +15,8 @@
 - [ ] **比对源稿覆盖率**:`渲染 .turn 数 ÷ 源稿 >> 轮次数` 和 `渲染 en 句数 ÷ 源稿句数`,**任一 < ~85% = 不合格**,回 step 5 补全
 - [ ] ⚠️ **只看 en=zh 配对数相等 ≠ 自检通过**——配对齐但只覆盖半篇也会"全绿",必须额外比源稿
 - [ ] **时间戳已注入**(podcast 模式):跑过 `scripts/enrich/add_timestamps.py`,`.timestamp` 数接近 `.turn` 数(超短插话除外),时间单调递增、末值 ≤ 总时长
+- [ ] **英文 PREP 源清洗跑过**:`clean_en.py finalize` 词覆盖 **≥0.98**(<0.98 = 丢句,回 PREP 重派该窗)
+- [ ] **英文纠错冒烟**:跑 `tests/fixtures/asr-clean-en-regression.md`,已知错专名全修对;存疑走 `⟨?⟩` 不硬编
 
 ### 中文模式(CLEAN 之后)覆盖闸
 

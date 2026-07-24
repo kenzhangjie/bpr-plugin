@@ -136,6 +136,7 @@ cat "$WORKDIR/metadata.json"
 | **auto-subs**(YouTube 自动)| 无 | 无 | 退化模式(见 `prep-and-modes.md`) | LLM 必须先重断句 + 加标点 |
 
 > **auto-subs 预处理(重断句 / 加标点 / speaker 推断 / 退化 essay)→ 见 `prep-and-modes.md`(PREP 阶段)。**
+> transcript + `metadata.json`(含 `description`)交 **PREP 英文子模式**做源清洗;`description` 是纠专名 / 认 host-guest 的 ground truth(= 小宇宙 shownote 的角色)。
 
 ### Step E · WebFetch(普通博客模式)抓取后的 sanity check
 
