@@ -236,16 +236,16 @@ python3 ~/.config/volc/volc_asr.py "$AUDIO_URL" "$WORKDIR/transcript.txt"
 **字准四层(源头→下游,2026-07-23 实测定案)**:
 
 1. **ASR 基座 = 火山 2.0**(env `VOLC_ASR_RESOURCE`,默认 `volc.seedasr.auc`;出问题设 `volc.bigasr.auc` 回退 1.0)。基础较强(Anthropic/CoWork/scaling 零偏置即对)。**绝不传 `corpus.context`**——2.0 会 55000001。
-2. **源头字准 = 热词文件**(可选但推荐;`corpus.boosting_table_name`,2.0 实测可用)。火山**自学习平台 → 热词管理 → 热词文件**建表,把**复现的固定专名**(Claude/Higgsfield/影视飓风…)在识别阶段掰对——这是唯一能直接提源头字准、且能覆盖 shownote 里没写的词的手段。经 `--boosting <名>` 或 env `VOLC_ASR_BOOSTING` 传入;内容源 `~/.config/volc/boosting.txt`(维护它、上传到控制台)。⚠️ 只放易错专名,别加常见词(过度偏置会把普通词硬掰)。
+2. **源头字准 = 热词文件**(可选但推荐;`corpus.boosting_table_name`,2.0 实测可用)。火山**自学习平台 → 热词管理 → 热词文件**建表,把**复现的固定专名**(Claude/Higgsfield/影视飓风…)在识别阶段掰对——这是唯一能直接提源头字准、且能覆盖 shownote 里没写的词的手段。经 `--boosting <名>` 或 env `VOLC_ASR_BOOSTING` 传入;内容源 `~/.config/volc/boosting.txt`(维护它、上传到控制台)。⚠️ 只放易错专名,别加常见词(过度偏置会把普通词硬掰)。boosting.txt 现由 `python3 volc_asr.py --dump-boosting` 从 glossary 生成,不再手维护。
 3. **本期专名 = 下游 CLEAN**(`clean.md`):Analyze/Review 读 **shownote + `podcast` 名 + glossary.txt**,纠本期特有名(Aultimate→Altimeter、小俊→小珺)——shownote 是比 ASR 更可信的独立信源。
-4. `correct_table.json`(事后替换,兜底):本地无歧义硬映射,补前三层遗漏。
+4. `glossary.txt` 第 3 列错法(事后替换,兜底):volc_asr.py 直读 glossary 构 `{错法→正确名}` 硬映射,补前三层遗漏。(旧的 correct_table.json 已并入 glossary,2026-07-25)
 
 输出 `transcript.txt` 是 `Speaker N HH:MM:SS.mmm` 格式(与妙记导出一致,下游无需改),
-并自动套用 `~/.config/volc/correct_table.json` 的专名硬映射(Higgsfield / Hockey Stick Growth / Midjourney …)。
+并自动套用 `~/.config/volc/glossary.txt` 第 3 列的专名硬映射(Higgsfield / Hockey Stick Growth / Midjourney …)。
 鉴权要点:火山 v3 大模型端点用 **X-Api-Key**(= `VOLC_API_KEY`),**不是** App-Key/Access-Key(后者会 401 `grant not found`)。
 
 > 转录质量仍可能有专名错词(中英混录里英文品牌名最易错)→ BPR 翻译 / 渲染阶段按上下文修正,
-> 新踩坑的无歧义专名顺手加进 `correct_table.json`,下次自动生效。
+> 新踩坑的无歧义专名顺手加进 `glossary.txt` 第 3 列,下次自动生效。
 
 #### Step B(fallback)· 飞书妙记转录(无火山密钥时;小宇宙必跑,B 站无字幕时跑)
 
