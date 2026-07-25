@@ -16,14 +16,14 @@
 - `metadata.json` 的 **title + podcast + shownote**(fetch_xiaoyuzhou.sh 已抓完整 shownote):嘉宾/公司/产品名、OUTLINE 全在里面。
   - shownote **仅小宇宙有**;B站/YouTube 无 `shownote` 字段时跳过它,靠 title + podcast + glossary + 全稿上下文即可(降级,不报错)。
   - ⚠️ **必带 `podcast` 字段**:主持人本名常只在节目名里(如"张小珺Jùn｜商业访谈录"的"珺"),shownote 正文没有——不喂 podcast 名,`小俊/小军` 就纠不对(实测踩过)。
-- `~/.config/volc/glossary.txt`:常驻专名词库(从多期 shownote 沉淀)。格式为 `专名|热度权重`(如 `张小珺|8`)——**读专名即可,忽略 `|` 后的权重**(权重是给火山热词表用的,对 CLEAN 参考无意义)。
+- `~/.config/volc/glossary.txt`:常驻专名词库,**唯一真源**。格式 `正确名|权重|错法1,错法2`(第 3 列可选,只放无歧义错法,供 volc_asr 硬纠)。CLEAN 读第 1 列当参考,忽略权重与错法列。
 
 产出 brief:
 1. **领域术语表**:综合 shownote + glossary,列本期专名(标保留英文/固定中文)。AI/科技/投资/growth 优先。
 2. **说话人 + 语气**:host / guest(host 名从 `podcast` 字段拿)。
 3. **存疑词清单**:扫全稿标可疑中英混词(同音/近音错、拼不成词的英文),供 Review 重点核。
 > **为什么 shownote 是关键**:它是 ASR 之外的独立信源。ASR 把基金名转成 Aultimate/Ultimatum,shownote 里白纸黑字 Altimeter Capital → Review 据此一次纠对(2026-07-23 实测有效)。
-> **专名飞轮(自动)**:Analyze 出的本期专名清单,CLEAN 结束时**自动 append 进 `~/.config/volc/glossary.txt`**(与已有去重,`专名|权重` 格式,权重按出现频次/置信给默认);其中 **≤10 字的单 token 子集**另吐 `~/.config/volc/hotword-candidates.txt`,当火山热词表 `bpr-ai-vc` 的更新待选。Ken 偶尔扫一眼 glossary 去噪即可,不用每期手动加。跑得越多,专名越准 —— 复利。
+> 本期新确认的专名由人工加进 glossary.txt(一行一条);热词文件用 `python3 ~/.config/volc/volc_asr.py --dump-boosting` 从 glossary 生成后手动上传火山控制台。最终热词以此 `--dump-boosting` 重生成的 `boosting.txt` 为准,`hotword-candidates.txt` 仅供 Ken 扫噪参考,避免又长出第二个热词真源。
 
 ## Step B · 切窗
 - CLEAN 在语义切章(STRUCTURE)之前,不能按章切 → 按**固定 turn 窗口(~25 条)**切。
