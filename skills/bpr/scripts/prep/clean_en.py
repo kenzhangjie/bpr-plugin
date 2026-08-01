@@ -21,9 +21,56 @@ def split_windows(blocks: list, size: int = 25) -> list[list]:
     return [blocks[i:i + size] for i in range(0, len(blocks), size)]
 
 
+GLOSSARY_DEFAULT = os.path.expanduser("~/.config/volc/glossary.txt")
+
+
 def load_mappings(path: str) -> dict:
+    """遗留 correct_table.json 读法。2026-07-25 起该文件已并入 glossary.txt 第 3 列,
+    仅作向后兼容保留 —— 新代码走 parse_glossary / glossary_mappings。"""
     with open(path, encoding="utf-8") as f:
         return json.load(f).get("mappings", {})
+
+
+def parse_glossary(path: str) -> list[tuple[str, str, list[str]]]:
+    """读 glossary.txt(专名单一真源)。每行 `正确名|权重|错法1,错法2,...`,
+    后两列可缺。返回 [(term, weight, [variants...])];文件不存在返回 []。"""
+    if not os.path.exists(path):
+        return []
+    out = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            cols = line.split("|")
+            term = cols[0].strip()
+            if not term:
+                continue
+            weight = cols[1].strip() if len(cols) > 1 else ""
+            variants = [v.strip() for v in cols[2].split(",")] if len(cols) > 2 else []
+            out.append((term, weight, [v for v in variants if v]))
+    return out
+
+
+def glossary_mappings(entries: list) -> dict:
+    """从 glossary 条目构 {错法 → 正确名} 硬映射(第 3 列)。"""
+    return {v: term for term, _w, variants in entries for v in variants}
+
+
+def scan_glossary(text: str, entries: list) -> list[dict]:
+    """用正文反查全表,返回命中的专名 + 它们的已知错法。
+    给 PREP Step 1 的 brief 用 —— 取代"人眼扫前 20 行"的抽样判断。"""
+    low = text.lower()
+    hits = []
+    for term, _w, variants in entries:
+        if len(term) < 3:
+            continue                      # 2 字以内太容易误命中
+        found = term.lower() in low
+        seen = [v for v in variants if v.lower() in low]
+        if found or seen:
+            hits.append({"term": term, "misspellings": variants,
+                         "seen_in_source": seen})
+    return hits
 
 
 def apply_correct_table(text: str, mappings: dict) -> str:
@@ -110,19 +157,51 @@ def finalize(turns: list, raw: str, mappings: dict, gate: float = 0.98) -> dict:
 
 def _main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--turns", required=True, help="拼好的 turns JSON")
-    ap.add_argument("--raw", required=True, help="原始逐字稿(算覆盖用)")
-    ap.add_argument("--correct-table",
-                    default=os.path.expanduser("~/.config/volc/correct_table.json"))
-    ap.add_argument("--glossary",
-                    default=os.path.expanduser("~/.config/volc/glossary.txt"))
+    ap.add_argument("--turns", help="拼好的 turns JSON(finalize 模式必填)")
+    ap.add_argument("--raw", help="原始逐字稿(算覆盖用;finalize 模式必填)")
+    ap.add_argument("--correct-table", default=None,
+                    help="遗留 correct_table.json;默认不用(专名真源是 glossary 第 3 列)")
+    ap.add_argument("--glossary", default=GLOSSARY_DEFAULT)
     ap.add_argument("--names", help="本期专名清单 JSON(list),用于回写 glossary")
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--out", help="输出 turns.clean.json(finalize 模式必填)")
+    ap.add_argument("--scan", metavar="TRANSCRIPT",
+                    help="扫描模式:用 transcript 反查 glossary 全表,输出命中专名 JSON,供 PREP Step 1 brief 用")
     a = ap.parse_args(argv)
+
+    entries = parse_glossary(a.glossary)
+    if not entries:
+        print(f"WARN: glossary 读不到或为空 → {a.glossary}(专名硬映射本轮不生效)",
+              file=sys.stderr)
+
+    # ── 扫描模式:只出 brief 用的命中清单,不做 finalize ──
+    if a.scan:
+        hits = scan_glossary(open(a.scan, encoding="utf-8").read(), entries)
+        print(json.dumps(hits, ensure_ascii=False, indent=1))
+        print(f"glossary {len(entries)} 条 → 本期命中 {len(hits)} 条", file=sys.stderr)
+        return 0
+
+    missing = [n for n in ("turns", "raw", "out") if not getattr(a, n)]
+    if missing:
+        ap.error("finalize 模式缺参数: " + ", ".join("--" + m for m in missing))
 
     turns = json.load(open(a.turns, encoding="utf-8"))
     raw = open(a.raw, encoding="utf-8").read()
-    mappings = load_mappings(a.correct_table) if os.path.exists(a.correct_table) else {}
+
+    # 专名硬映射:glossary 第 3 列为真源;--correct-table 仅遗留兼容,glossary 优先。
+    mappings = {}
+    if a.correct_table:
+        if os.path.exists(a.correct_table):
+            mappings.update(load_mappings(a.correct_table))
+        else:
+            print(f"WARN: --correct-table 指向的文件不存在 → {a.correct_table}",
+                  file=sys.stderr)
+    mappings.update(glossary_mappings(entries))
+    if not mappings:
+        print("WARN: 专名硬映射为空,apply_correct_table 本轮等于空转 —— "
+              "确认 glossary 第 3 列(错法)是否已维护", file=sys.stderr)
+    else:
+        print(f"专名硬映射 {len(mappings)} 条(来自 glossary 第 3 列)")
+
     res = finalize(turns, raw, mappings)
     json.dump(res["turns"], open(a.out, "w", encoding="utf-8"),
               ensure_ascii=False, indent=1)

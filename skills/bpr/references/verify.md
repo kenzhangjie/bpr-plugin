@@ -16,6 +16,10 @@
 - [ ] ⚠️ **只看 en=zh 配对数相等 ≠ 自检通过**——配对齐但只覆盖半篇也会"全绿",必须额外比源稿
 - [ ] **时间戳已注入**(podcast 模式):跑过 `scripts/enrich/add_timestamps.py`,`.timestamp` 数接近 `.turn` 数(超短插话除外),时间单调递增、末值 ≤ 总时长
 - [ ] **英文 PREP 源清洗跑过**:`clean_en.py finalize` 词覆盖 **≥0.98**(<0.98 = 丢句,回 PREP 重派该窗)
+- [ ] **glossary 真的用上了**(2026-08-01 新增,别再靠巧合):
+  - [ ] Step 1 跑过 `clean_en.py --scan <transcript>`,命中项进了 brief;`seen_in_source` 非空的错法在子代理 prompt 里点了名
+  - [ ] finalize 那步 stdout 是 `专名硬映射 N 条`(N>0),**不是** `WARN: 专名硬映射为空` —— 覆盖率 `ok=True` 不代表硬映射跑过,两个闸互相独立
+  - [ ] 收尾传了 `--names`,本期新专名已回写 glossary(飞轮转了)
 - [ ] **英文纠错冒烟**:跑 `tests/fixtures/asr-clean-en-regression.md`,已知错专名全修对;存疑走 `⟨?⟩` 不硬编
 
 ### 中文模式(CLEAN 之后)覆盖闸

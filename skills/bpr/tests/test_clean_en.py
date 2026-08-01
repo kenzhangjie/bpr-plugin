@@ -95,6 +95,61 @@ def test_finalize_flags_dropped_content():
     assert r["ok"] is False and r["coverage"] < 0.98
 
 
+def test_parse_glossary_three_columns(tmp_path):
+    g = tmp_path / "glossary.txt"
+    g.write_text("OpenAI|9|Opening Eye\n"
+                 "Codex|8|Codeex\n"
+                 "Higgsfield|4|Hicksfield,Hixfield\n"
+                 "PlainTerm\n"
+                 "WeightOnly|6\n"
+                 "# comment line\n"
+                 "\n", encoding="utf-8")
+    e = ce.parse_glossary(str(g))
+    assert ("OpenAI", "9", ["Opening Eye"]) in e
+    assert ("Higgsfield", "4", ["Hicksfield", "Hixfield"]) in e
+    assert ("PlainTerm", "", []) in e
+    assert ("WeightOnly", "6", []) in e
+    assert len(e) == 5  # 注释行和空行被丢掉
+
+
+def test_parse_glossary_missing_file_returns_empty():
+    assert ce.parse_glossary("/definitely/not/here.txt") == []
+
+
+def test_glossary_mappings_builds_variant_to_term():
+    e = [("OpenAI", "9", ["Opening Eye"]), ("Higgsfield", "4", ["Hicksfield", "Hixfield"])]
+    assert ce.glossary_mappings(e) == {"Opening Eye": "OpenAI",
+                                       "Hicksfield": "Higgsfield",
+                                       "Hixfield": "Higgsfield"}
+
+
+def test_glossary_mappings_feed_finalize_end_to_end(tmp_path):
+    # 回归 2026-08-01:correct_table.json 已删,映射必须能从 glossary 第 3 列构出来。
+    g = tmp_path / "glossary.txt"
+    g.write_text("OpenAI|9|Opening Eye\nCodex|8|Codeex\n", encoding="utf-8")
+    m = ce.glossary_mappings(ce.parse_glossary(str(g)))
+    turns = [{"speaker": "Sam", "sents": ["Opening Eye ships Codeex."]}]
+    r = ce.finalize(turns, "OpenAI ships Codex.", m)
+    assert r["turns"][0]["sents"][0] == "OpenAI ships Codex."
+
+
+def test_scan_glossary_finds_terms_and_seen_misspellings():
+    e = [("OpenAI", "9", ["Opening Eye"]),
+         ("Codex", "8", ["Codeex"]),
+         ("Higgsfield", "4", ["Hicksfield"]),
+         ("Pi", "9", [])]
+    hits = ce.scan_glossary("we use OpenAI and Codeex daily", e)
+    by = {h["term"]: h for h in hits}
+    assert set(by) == {"OpenAI", "Codex"}          # Higgsfield 没出现;Pi 太短被跳过
+    assert by["OpenAI"]["seen_in_source"] == []    # 正确拼写命中,没见到错法
+    assert by["Codex"]["seen_in_source"] == ["Codeex"]  # 只见到错法 → 必须点名
+
+
+def test_scan_glossary_is_case_insensitive():
+    e = [("OpenAI", "9", [])]
+    assert ce.scan_glossary("openai rocks", e)[0]["term"] == "OpenAI"
+
+
 def test_finalize_proper_noun_correction_does_not_lower_coverage():
     # Regression: proper noun corrections should not artificially lower coverage.
     # The sub-agent has already corrected the turns output ("OpenAI", "Ambrosino", "Codex"),
