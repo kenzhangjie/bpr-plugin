@@ -5,6 +5,13 @@ All notable changes to this plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.6.3 — 2026-08-02
+
+**reader 自带划线收藏 + 修掉 publish 里会删 landing 的守卫。**
+
+- **模板加 `mark.ken.solar/embed.js`**:划线收藏以前靠发布后跑 `inject-embed.mjs` 事后注入,于是两条漏法——批量重渲染会把标签冲掉(114 篇里 12 篇栽在同一分钟的重渲染上),注入器跑完之后新发布的压根没有。标签进模板,生成即带。
+- **`publish.md` 的 `INDEX.html` 守卫改用 Python 读真实 dirent**(L5)。原来的 `[ -f .../INDEX.html ] && rm` 在 macOS 大小写不敏感 FS 上,目录里只有小写 `index.html` 时判断也为真,会把 landing 页删掉——它想防的问题它自己会造成。
+
 ## v1.6.2 — 2026-07-23
 
 **CLEAN 硬化(grilling 三项)+ 修 ch11 render bug。**

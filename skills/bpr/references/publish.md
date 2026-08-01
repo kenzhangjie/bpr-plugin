@@ -31,10 +31,18 @@ Transcript/(= bpr.ken.solar 部署根)固定结构:
 新 reader 写完后,用 `scripts/publish/build_index.py` 重建 landing `index.html`(扫描 Transcript 目录下所有 `<stem>.html`,生成卡片列表)。
 
 > ⚠️ **INDEX.html 大小写坑(L5)**:Transcript 目录若有遗留的大写 `INDEX.html`,macOS 大小写不敏感 FS 会让 `open("index.html","w")` 匹配到它、只改内容不改名,而 Vercel 路由大小写敏感,只认小写 `index.html` 当 root → `/` 返回 404。
-> 跑 build_index 之前先清:
+> 跑 build_index 之前先清。**必须比对真实 dirent,不能用 `[ -f INDEX.html ]`** ——
+> macOS 大小写不敏感 FS 上,只有小写 `index.html` 时那个判断也为真,会把 landing 删掉:
 > ```bash
-> [ -f "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/INDEX.html" ] && \
->   rm "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/INDEX.html"
+> python3 - <<'PY'
+> import os
+> T = os.path.expanduser("~/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript")
+> names = os.listdir(T)                      # 真实 dirent,保留大小写
+> print("INDEX.html:", "INDEX.html" in names, " index.html:", "index.html" in names)
+> if "INDEX.html" in names:                  # 只有真的存在大写才删
+>     os.remove(os.path.join(T, "INDEX.html"))
+>     print("已删除大写 INDEX.html")
+> PY
 > ```
 > 详见 `lessons-learned.md` L5。
 
