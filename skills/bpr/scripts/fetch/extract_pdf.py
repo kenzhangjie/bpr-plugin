@@ -179,10 +179,9 @@ def build_metadata(doc, pdf_path):
 
     info_title = (info.get("title") or "").strip()
     if info_title and not is_junk_title(info_title):
-        title, title_src, confidence["title"] = info_title, "pdf:info-title", "high"
+        title, confidence["title"] = info_title, "high"
     else:
         title = cover_max_font_text(cover) if cover is not None else None
-        title_src = "pdf:cover-maxfont" if title else "pdf:none"
         confidence["title"] = "medium" if title else "low"
 
     org = find_org_name(cover_text) or (info.get("author") or "").strip() or None
@@ -206,8 +205,11 @@ def build_metadata(doc, pdf_path):
         "publication": org,
         "source_slug": slug,
         "canonical": str(pathlib.Path(pdf_path).resolve()),
-        # source 只报最关键的那条策略(date),与 extract_metadata.py 语义一致
-        "source": date_src if date else title_src,
+        # source 只报 date 的来源,与 extract_metadata.py 语义一致。
+        # 无日期时 date_src 已是 "pdf:none",绝不回落成 title 的命中策略 ——
+        # 回落会让 ingest.md「见 pdf:none / pdf:info-creationdate 就问用户要
+        # 真实发布日期」的守卫在最需要问的场景下不触发。
+        "source": date_src,
     }
     return meta, confidence
 
@@ -331,11 +333,16 @@ def run(pdf_path, workdir, truncate=True, tables_mode="img"):
                 f"需要 OCR —— 走 scripts/fetch/ocr_pdf.py(阶段 3,尚未实现)。",
                 exit_code=3)
 
+        # 刻意与 mode 解耦:TEXT_RATIO_HI=0.8 意味着最多 20% 的页可以完全没有
+        # 文字层却仍被判成 "text"。而「正文有文字层、图表页/附录页是整页扫描图」
+        # 恰恰是研报最常见形态,这些页会 pages.jsonl 为空、body 里被 if text
+        # 跳过、stdout 全程无提示 —— 静默丢内容。
         need_ocr_pages = [i + 1 for i, page in enumerate(doc)
                           if not page_has_text(page)]
-        if mode == "mixed" and need_ocr_pages:
+        if need_ocr_pages:
             raise PdfInputError(
-                f"混合模式:第 {need_ocr_pages} 页无文字层,需要 OCR 补齐 —— "
+                f"第 {need_ocr_pages} 页无文字层(mode={mode},"
+                f"text_ratio={ratio:.2f}),需要 OCR 补齐 —— "
                 f"走 scripts/fetch/ocr_pdf.py(阶段 3,尚未实现)。"
                 f"跳过这些页会静默丢内容,故不继续。",
                 exit_code=3)
@@ -347,8 +354,12 @@ def run(pdf_path, workdir, truncate=True, tables_mode="img"):
             tables_by_page.setdefault(entry["page"], []).append(entry)
 
         page_records, page_texts, anchors_total = [], [], 0
+        hf_lines_dropped = 0
         for page_no, page in enumerate(doc, start=1):
+            # 如实统计:content_lines 是全量真源,与过滤后的差就是实际删掉的行数
+            raw_count = len(layout.content_lines(page))
             lines = layout.page_lines(page, drop_set)
+            hf_lines_dropped += raw_count - len(lines)
             lines, anchors = strip_table_lines(lines, tables_by_page.get(page_no, []))
             anchors_total += anchors
             paragraphs = layout.lines_to_paragraphs(lines)
@@ -384,8 +395,10 @@ def run(pdf_path, workdir, truncate=True, tables_mode="img"):
         "text_ratio": round(ratio, 3),
         "pages": total_pages,
         "chars": len(body),
-        "hf_dropped": len(drop_set),
+        "hf_dropped": len(drop_set),            # 模式条数
         "hf_texts": sorted(drop_set),
+        "hf_lines_dropped": hf_lines_dropped,   # 实际删掉的行数,与上面含义不同
+        "hf_detection_skipped": total_pages < layout.HF_MIN_PAGES,
         "tables": len(tables),
         "table_anchors": anchors_total,
         "truncated_from": cut_at,
@@ -401,9 +414,14 @@ def _print_report(report):
     print(f"模式         {report['mode']}(text_ratio={report['text_ratio']})")
     print(f"页数         {report['pages']}")
     print(f"正文         {report['chars']} 字符 → {report['workdir']}/body.txt")
-    print(f"剔除页眉页脚  {report['hf_dropped']} 条")
-    for text in report["hf_texts"]:
-        print(f"             · {text}")
+    if report["hf_detection_skipped"]:
+        print(f"页眉页脚     页数不足 {layout.HF_MIN_PAGES},"
+              f"跳过页眉页脚重复检测(未删任何行)")
+    else:
+        print(f"剔除页眉页脚  {report['hf_dropped']} 条模式,"
+              f"实际删除 {report['hf_lines_dropped']} 行")
+        for text in report["hf_texts"]:
+            print(f"             · {text}")
     print(f"表格         {report['tables']} 个,正文留锚 {report['table_anchors']} 处"
           f" → {report['workdir']}/tables.json")
     if report["truncated_from"] is not None:

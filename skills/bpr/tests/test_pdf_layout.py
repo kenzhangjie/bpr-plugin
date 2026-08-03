@@ -9,7 +9,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts" /
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import pdf_layout as pl
-from pdf_fixtures import build_report_pdf
+from pdf_fixtures import build_band_content_pdf, build_report_pdf
 
 
 def test_norm_hf_replaces_digits_and_strips():
@@ -107,14 +107,65 @@ def test_page_lines_single_column_keeps_y_order(tmp_path):
         f"left p2 line{i} text" for i in range(6)]
 
 
-def test_page_lines_drops_repeated_hf(tmp_path):
-    p = tmp_path / "r.pdf"
-    build_report_pdf(p, npages=5)
+def test_content_lines_keeps_everything_including_bands(tmp_path):
+    """content_lines 是内容的唯一真源:一行都不许少。"""
+    p = tmp_path / "b.pdf"
+    build_band_content_pdf(p, npages=5)
+    doc = fitz.open(p)
+    texts = [l[4] for l in pl.content_lines(doc[1])]
+    doc.close()
+    assert "REPEATED HEADER LINE" in texts
+    assert "REPEATED FOOTER LINE" in texts
+    assert "unique top beta" in texts
+    assert "unique bottom beta" in texts
+    assert sum(1 for t in texts if t.startswith("middle body")) == 6
+
+
+def test_page_lines_keeps_non_repeated_band_content(tmp_path):
+    """回归钉:页边距紧于 8% 时,带内的真正文必须留下。
+
+    设计只授权删「≥60% 页面重复」的行。无条件剔整条带会静默吃掉
+    每页首尾的真正文——这是修复前必然失败的那条断言。
+    """
+    p = tmp_path / "b.pdf"
+    build_band_content_pdf(p, npages=5)
     doc = fitz.open(p)
     drop = pl.find_repeated_hf(doc)
     texts = [l[4] for l in pl.page_lines(doc[1], drop)]
     doc.close()
-    assert not any("中金" in t or "免责" in t for t in texts)
+    assert "unique top beta" in texts
+    assert "unique bottom beta" in texts
+
+
+def test_page_lines_keeps_band_content_in_short_document(tmp_path):
+    """2 页文档:样本不足跳过重复检测 → 一行都不许删,带内也一样。"""
+    p = tmp_path / "b.pdf"
+    build_band_content_pdf(p, npages=2)
+    doc = fitz.open(p)
+    drop = pl.find_repeated_hf(doc)
+    texts = [l[4] for l in pl.page_lines(doc[0], drop)]
+    all_texts = [l[4] for l in pl.content_lines(doc[0])]
+    doc.close()
+    assert drop == set()
+    assert len(texts) == len(all_texts)
+    assert "unique top alpha" in texts
+    assert "unique bottom alpha" in texts
+    assert "REPEATED HEADER LINE" in texts     # 只 2 页,不敢判定,保守留下
+
+
+def test_page_lines_drops_repeated_hf(tmp_path):
+    """过滤方向必须对着「跨页重复的带内行」,而不是对着正文。"""
+    p = tmp_path / "b.pdf"
+    build_band_content_pdf(p, npages=5)
+    doc = fitz.open(p)
+    drop = pl.find_repeated_hf(doc)
+    texts = [l[4] for l in pl.page_lines(doc[1], drop)]
+    doc.close()
+    # 真页眉页脚(每页重复)确实不在结果里
+    assert "REPEATED HEADER LINE" not in texts
+    assert "REPEATED FOOTER LINE" not in texts
+    # 只出现在单页的带内行仍在结果里
+    assert "unique top beta" in texts
 
 
 def test_join_lines_removes_hyphen_before_lowercase():
@@ -156,6 +207,44 @@ def test_lines_to_paragraphs_breaks_on_column_switch():
     ]
     paras = pl.lines_to_paragraphs(lines)
     assert paras == ["left column last line", "right column first line"]
+
+
+def test_lines_to_paragraphs_isolates_heading_with_zero_whitespace():
+    """标题上下留白为 0 时也必须独立成段。
+
+    y0 当锚点时行距被字号污染:大字号标题的 y0 被上抬,它前后的 delta 被压小,
+    两条 delta 规则全部失灵,标题就粘进相邻段落。行高(y1-y0)是字号的代理,
+    跟「页面中位行高」比即可把标题揪出来。
+    """
+    lines = [
+        (60, 100, 300, 112, "body line one"),       # 行高 12
+        (60, 114, 300, 126, "body line two"),       # 行高 12
+        (60, 128, 300, 144, "SECTION TITLE"),       # 行高 16 → 高行
+        (60, 146, 300, 158, "body line three"),     # 行高 12
+        (60, 160, 300, 172, "body line four"),      # 行高 12
+    ]
+    # 全部 delta 都 ≤ 中位行距 × 1.3,单靠间距规则一段都断不出来
+    paras = pl.lines_to_paragraphs(lines)
+    assert paras == ["body line one body line two",
+                     "SECTION TITLE",
+                     "body line three body line four"]
+
+
+def test_lines_to_paragraphs_short_line_does_not_split():
+    """矮行(脚注上标被 fitz 切成独立行)不得触发断段。
+
+    这是「跟页面中位行高比」而不是「跟相邻行行高比」的原因:相邻比较会被
+    上标坑成一页切五段。
+    """
+    lines = [
+        (60, 100, 300, 112, "uniform line one"),    # 行高 12
+        (60, 114, 300, 126, "uniform line two"),
+        (300, 128, 306, 137, "1"),                  # 行高 9 → 矮行(上标)
+        (60, 142, 300, 154, "uniform line three"),
+        (60, 156, 300, 168, "uniform line four"),
+    ]
+    paras = pl.lines_to_paragraphs(lines)
+    assert len(paras) == 1
 
 
 def test_lines_to_paragraphs_single_line():

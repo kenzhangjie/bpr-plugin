@@ -10,7 +10,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts" /
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import extract_pdf as ep
-from pdf_fixtures import build_report_pdf, build_pdf_with_table
+from pdf_fixtures import (build_band_content_pdf, build_pdf_with_blank_pages,
+                          build_pdf_with_disclaimer, build_pdf_with_table,
+                          build_report_pdf)
 
 
 def test_is_pdf_true_for_real_pdf(tmp_path):
@@ -167,6 +169,24 @@ def test_build_metadata_falls_back_to_creation_date(tmp_path):
     d.close()
     assert meta["date"] == "2026-08-01"
     assert meta["source"] == "pdf:info-creationdate"
+    assert conf["date"] == "low"
+
+
+def test_build_metadata_source_reports_pdf_none_when_date_missing(tmp_path):
+    """封面无日期 + 无 CreationDate + 有标题 → source 必须是 pdf:none。
+
+    回落成 title 的命中策略(pdf:cover-maxfont)会让 ingest.md 那条
+    「看到 pdf:none / pdf:info-creationdate 就主动问用户要真实日期」的守卫
+    在最需要问的场景下不触发,直接踩「绝不静默用今天」的硬规则。
+    """
+    p = tmp_path / "r.pdf"
+    build_report_pdf(p, npages=5, cover_date=False, creation_date="")
+    d = fitz.open(p)
+    meta, conf = ep.build_metadata(d, p)
+    d.close()
+    assert meta["date"] is None
+    assert meta["title"] == "中国AI算力产业深度报告"      # 标题确实抓到了
+    assert meta["source"] == "pdf:none"
     assert conf["date"] == "low"
 
 
@@ -441,3 +461,153 @@ def test_main_returns_two_for_non_pdf(tmp_path, capsys):
     p.write_text("nope")
     code = ep.main([str(p), "--workdir", str(tmp_path / "w")])
     assert code == 2
+
+
+def test_run_raises_when_text_mode_still_has_pages_without_text(tmp_path):
+    """TEXT_RATIO_HI=0.8 允许 20% 的页完全没有文字层却仍判 "text"。
+
+    「正文有文字层、图表页/附录页是整页扫描图」正是研报最常见形态。
+    这些页 pages.jsonl 为空、body 里被 if text 跳过、stdout 全程无提示——
+    需要 OCR 的判断必须与 mode 解耦。
+    """
+    p = tmp_path / "img.pdf"
+    build_pdf_with_blank_pages(p, npages=20, blank_pages=(17, 18, 19))
+    with pytest.raises(ep.PdfInputError) as excinfo:
+        ep.run(p, tmp_path / "w")
+    assert excinfo.value.exit_code == 3
+    msg = str(excinfo.value)
+    assert "17" in msg and "18" in msg and "19" in msg
+    assert "ocr_pdf.py" in msg
+
+
+def test_run_reports_actual_hf_lines_dropped(tmp_path):
+    """模式条数 ≠ 实际删除行数,两者都要报。"""
+    pdf = tmp_path / "b.pdf"
+    build_band_content_pdf(pdf, npages=5)
+    work = tmp_path / "w"
+    report = ep.run(pdf, work)
+    # 每页一条页眉 + 一条页脚 × 5 页 = 10 行
+    assert report["hf_dropped"] == 2
+    assert report["hf_lines_dropped"] == 10
+
+
+def test_run_keeps_band_content_out_of_thin_air(tmp_path):
+    """端到端:带内的非重复真正文必须出现在 body.txt 里。"""
+    pdf = tmp_path / "b.pdf"
+    build_band_content_pdf(pdf, npages=5)
+    work = tmp_path / "w"
+    ep.run(pdf, work)
+    body = (work / "body.txt").read_text(encoding="utf-8")
+    assert "unique top beta" in body
+    assert "unique bottom beta" in body
+    assert "REPEATED HEADER LINE" not in body
+    assert "REPEATED FOOTER LINE" not in body
+
+
+def test_run_body_not_gutted_by_reversed_drop_filter(tmp_path):
+    """drop_set 若拿去过滤正文区,同模板的正文行会跨页归一成同串而被整体删空。"""
+    doc = fitz.open()
+    for pno in range(5):
+        page = doc.new_page(width=595, height=842)
+        for i in range(38):
+            page.insert_text((60, 90 + i * 18),
+                             f"body line {i} page {pno + 1} of running report text",
+                             fontsize=9)
+    pdf = tmp_path / "tmpl.pdf"
+    doc.save(str(pdf))
+    doc.close()
+
+    work = tmp_path / "w"
+    report = ep.run(pdf, work)
+    body = (work / "body.txt").read_text(encoding="utf-8")
+    assert len(body.strip()) > 1000
+    assert "body line 0 page 1" in body
+    assert report["hf_lines_dropped"] == 0
+
+
+def test_run_short_document_skips_hf_detection_and_says_so(tmp_path, capsys):
+    """页数 < HF_MIN_PAGES 时跳过重复检测,且必须在 stdout 说清楚未删任何行。"""
+    pdf = tmp_path / "b.pdf"
+    build_band_content_pdf(pdf, npages=2)
+    code = ep.main([str(pdf), "--workdir", str(tmp_path / "w")])
+    assert code == 0
+    out = capsys.readouterr().out
+    assert str(ep.layout.HF_MIN_PAGES) in out
+    assert "跳过" in out
+    body = (tmp_path / "w" / "body.txt").read_text(encoding="utf-8")
+    assert "unique top alpha" in body
+    assert "REPEATED HEADER LINE" in body      # 不敢判定就不删
+
+
+def test_run_truncation_actually_shortens_body_and_is_reported(tmp_path, capsys):
+    pdf = tmp_path / "d.pdf"
+    build_pdf_with_disclaimer(pdf, npages=6)
+
+    full = ep.run(pdf, tmp_path / "full", truncate=False)
+    assert full["truncated_from"] is None
+    assert full["truncated_pages"] == 0
+
+    code = ep.main([str(pdf), "--workdir", str(tmp_path / "cut")])
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "已截断" in out and "第 5 页" in out
+
+    cut_body = (tmp_path / "cut" / "body.txt").read_text(encoding="utf-8")
+    full_body = (tmp_path / "full" / "body.txt").read_text(encoding="utf-8")
+    assert len(cut_body) < len(full_body)
+    assert "免责声明" in full_body
+    assert "免责声明" not in cut_body
+
+
+def test_run_no_truncate_flag_keeps_disclaimer(tmp_path, capsys):
+    pdf = tmp_path / "d.pdf"
+    build_pdf_with_disclaimer(pdf, npages=6)
+    code = ep.main([str(pdf), "--workdir", str(tmp_path / "w"), "--no-truncate"])
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "已截断" not in out
+    body = (tmp_path / "w" / "body.txt").read_text(encoding="utf-8")
+    assert "免责声明" in body
+
+
+def test_run_table_anchor_end_to_end(tmp_path):
+    """tables_by_page 分组 → strip_table_lines → body 里出现锚记。"""
+    import json
+    pdf = tmp_path / "t.pdf"
+    build_pdf_with_table(pdf, npages=4)
+    work = tmp_path / "w"
+    report = ep.run(pdf, work)
+
+    assert report["tables"] == 1
+    assert report["table_anchors"] == 1
+    body = (work / "body.txt").read_text(encoding="utf-8")
+    assert "[[table:p1-0]]" in body
+    assert "r0c0" not in body           # 表格文字层已从正文剔除
+    tables = json.loads((work / "tables.json").read_text(encoding="utf-8"))
+    assert len(tables) == 1 and tables[0]["page"] == 1
+
+
+def test_run_tables_md_mode_keeps_table_text_and_writes_no_bbox(tmp_path):
+    """--tables md:不采 bbox、不留锚,表格原始文字留在正文里。"""
+    import json
+    pdf = tmp_path / "t.pdf"
+    build_pdf_with_table(pdf, npages=4)
+    work = tmp_path / "w"
+    report = ep.run(pdf, work, tables_mode="md")
+
+    assert report["tables"] == 0
+    assert report["table_anchors"] == 0
+    body = (work / "body.txt").read_text(encoding="utf-8")
+    assert "[[table:" not in body
+    assert "r0c0" in body
+    assert json.loads((work / "tables.json").read_text(encoding="utf-8")) == []
+
+
+def test_main_tables_md_flag_wires_through(tmp_path, capsys):
+    pdf = tmp_path / "t.pdf"
+    build_pdf_with_table(pdf, npages=4)
+    code = ep.main([str(pdf), "--workdir", str(tmp_path / "w"), "--tables", "md"])
+    assert code == 0
+    body = (tmp_path / "w" / "body.txt").read_text(encoding="utf-8")
+    assert "r0c0" in body
+    assert "[[table:" not in body
