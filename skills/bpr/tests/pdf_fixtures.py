@@ -37,3 +37,26 @@ def build_report_pdf(path, npages=5, two_col=True, header=True, cover=True,
     doc.set_metadata({"title": title, "author": author, "creationDate": creation_date})
     doc.save(str(path))
     doc.close()
+
+
+def build_pdf_with_table(path, npages=4):
+    """含一个 3x3 网格表的 PDF,表格在第 1 页正文中部。"""
+    doc = fitz.open()
+    for pno in range(npages):
+        page = doc.new_page(width=A4_W, height=A4_H)
+        page.insert_text((60, 120), "Some body text above the table", fontsize=11)
+        if pno == 0:
+            x0, y0, cw, ch = 60, 200, 150, 30
+            for r in range(4):
+                page.draw_line(fitz.Point(x0, y0 + r * ch),
+                               fitz.Point(x0 + 3 * cw, y0 + r * ch))
+            for c in range(4):
+                page.draw_line(fitz.Point(x0 + c * cw, y0),
+                               fitz.Point(x0 + c * cw, y0 + 3 * ch))
+            for r in range(3):
+                for c in range(3):
+                    page.insert_text((x0 + c * cw + 6, y0 + r * ch + 20),
+                                     f"r{r}c{c}", fontsize=9)
+        page.insert_text((60, 400), "Body text below the table", fontsize=11)
+    doc.save(str(path))
+    doc.close()

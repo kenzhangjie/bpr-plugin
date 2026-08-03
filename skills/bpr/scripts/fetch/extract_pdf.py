@@ -207,3 +207,61 @@ def build_metadata(doc, pdf_path):
         "source": date_src if date else title_src,
     }
     return meta, confidence
+
+
+def collect_tables(doc):
+    """表格 bbox 的单一真源,写进 tables.json 给 extract_pdf_images.py 读。
+
+    刻意不让两个脚本各跑一次 find_tables():两次调用的 bbox 未必一致,
+    锚点会错位。
+    """
+    out = []
+    for page_no, page in enumerate(doc, start=1):
+        try:
+            finder = page.find_tables()
+        except Exception:          # find_tables 对畸形页会抛,跳过该页而非整体失败
+            continue
+        for index, table in enumerate(finder.tables):
+            out.append({
+                "page": page_no,
+                "index": index,
+                "bbox": [float(v) for v in table.bbox],
+                "markdown": table.to_markdown(),
+            })
+    return out
+
+
+def table_anchor(page_no, index):
+    return f"[[table:p{page_no}-{index}]]"
+
+
+def _inside(line, bbox):
+    """行中心是否落在 bbox 内。用中心而非完全包含,容忍 1-2pt 的边界溢出。"""
+    x0, y0, x1, y1 = bbox
+    cx, cy = (line[0] + line[2]) / 2.0, (line[1] + line[3]) / 2.0
+    return x0 <= cx <= x1 and y0 <= cy <= y1
+
+
+def strip_table_lines(lines, tables_on_page):
+    """把落在表格 bbox 内的行换成一个锚记。返回 (kept_lines, anchors_inserted)。"""
+    if not tables_on_page:
+        return lines, 0
+
+    kept, seen, anchors = [], set(), 0
+    for line in lines:
+        hit = None
+        for table in tables_on_page:
+            if _inside(line, table["bbox"]):
+                hit = table
+                break
+        if hit is None:
+            kept.append(line)
+            continue
+        key = (hit["page"], hit["index"])
+        if key in seen:
+            continue                    # 同一表格的后续行直接丢
+        seen.add(key)
+        anchors += 1
+        kept.append((line[0], line[1], line[2], line[3],
+                     table_anchor(hit["page"], hit["index"])))
+    return kept, anchors

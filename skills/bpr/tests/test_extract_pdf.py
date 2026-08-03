@@ -10,7 +10,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts" /
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import extract_pdf as ep
-from pdf_fixtures import build_report_pdf
+from pdf_fixtures import build_report_pdf, build_pdf_with_table
 
 
 def test_is_pdf_true_for_real_pdf(tmp_path):
@@ -197,3 +197,61 @@ def test_build_metadata_canonical_is_absolute_path(tmp_path):
     meta, _ = ep.build_metadata(d, p)
     d.close()
     assert meta["canonical"] == str(p.resolve())
+
+
+def test_collect_tables_finds_grid_table(tmp_path):
+    p = tmp_path / "t.pdf"
+    build_pdf_with_table(p)
+    d = fitz.open(p)
+    tables = ep.collect_tables(d)
+    d.close()
+    assert len(tables) == 1
+    entry = tables[0]
+    assert entry["page"] == 1
+    assert entry["index"] == 0
+    assert len(entry["bbox"]) == 4
+    assert "r0c0" in entry["markdown"]
+
+
+def test_collect_tables_bbox_is_json_serialisable(tmp_path):
+    """bbox 必须是 list 而非 fitz.Rect —— tables.json 要能被 json.dump。"""
+    import json
+    p = tmp_path / "t.pdf"
+    build_pdf_with_table(p)
+    d = fitz.open(p)
+    tables = ep.collect_tables(d)
+    d.close()
+    json.dumps(tables)          # 不抛异常即通过
+    assert all(isinstance(t["bbox"], list) for t in tables)
+
+
+def test_table_anchor_format():
+    assert ep.table_anchor(1, 0) == "[[table:p1-0]]"
+
+
+def test_strip_table_lines_replaces_table_text_with_single_anchor():
+    """表格区域的行必须从正文剔除并留一个锚记。
+
+    不剔除的话,表格既成了图、它那份乱序文字层又留在正文里,
+    会同时污染 TL;DR 和翻译。
+    """
+    lines = [
+        (60, 120, 300, 132, "Some body text above the table"),
+        (66, 210, 100, 222, "r0c0"),
+        (216, 210, 250, 222, "r0c1"),
+        (60, 400, 300, 412, "Body text below the table"),
+    ]
+    tables = [{"page": 1, "index": 0, "bbox": [60, 200, 510, 290], "markdown": "|x|"}]
+    kept, anchors = ep.strip_table_lines(lines, tables)
+    texts = [l[4] for l in kept]
+    assert texts == ["Some body text above the table",
+                     "[[table:p1-0]]",
+                     "Body text below the table"]
+    assert anchors == 1
+
+
+def test_strip_table_lines_noop_when_no_tables():
+    lines = [(60, 120, 300, 132, "only body")]
+    kept, anchors = ep.strip_table_lines(lines, [])
+    assert kept == lines
+    assert anchors == 0
