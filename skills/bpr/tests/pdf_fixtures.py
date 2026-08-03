@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pathlib
+
 import fitz
 
 A4_W, A4_H = 595, 842
@@ -108,6 +110,70 @@ def build_pdf_with_blank_pages(path, npages=20, blank_pages=(17, 18, 19)):
             page.insert_text((60, 120 + i * 16),
                              f"page {pno} body line {i} with plenty of text here",
                              fontsize=10)
+    doc.save(str(path))
+    doc.close()
+
+
+_UNICODE_FONT_CANDIDATES = [
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+]
+
+
+def unicode_font_path():
+    """找一个能在提取文本里保留冷僻码位(项目符号 / 零宽字符)的系统 Unicode 字体;
+    找不到返回 None。
+
+    fitz 内置字体(helv / china-s)都不认 U+2022(•)或 U+200B(零宽空格):
+    插入后会被替换成别的字形(实测 helv/china-s 插入 '•' 都变成 middle dot 0xb7,
+    china-s 插入零宽空格则直接被吞掉)——都测不出真实场景。必须显式嵌入一个
+    真正支持这些码位的 TTF,才能让原字符原样出现在提取文本里。
+    """
+    for p in _UNICODE_FONT_CANDIDATES:
+        if pathlib.Path(p).exists():
+            return p
+    return None
+
+
+def build_bullet_everywhere_pdf(path, npages=5):
+    """R1 回归夹具:同一个短文本('•')既落在带内、也落在正文区,且跨页重复。
+    调用前请先用 unicode_font_path() 探测字体是否可用,不可用则应 skip 该测试。
+
+    实测('韩国 UGC 平台内容审核风险说明.pdf'):fitz 把项目符号列表的 '•' 切成
+    独立一行,恰好落在带内的 '•' 被判定为跨页重复的页眉模式;若过滤只看文本
+    不看位置,正文区里同形的 '•' 行会被一并删掉(实测 239 行,219 行来自正文区)。
+    这份夹具让带内、正文区各有一份跨页重复的 '•',用来钉住:只删带内那份。
+    """
+    font = unicode_font_path()
+    doc = fitz.open()
+    for pno in range(npages):
+        page = doc.new_page(width=A4_W, height=A4_H)
+        page.insert_font(fontname="F0", fontfile=font)
+        page.insert_text((60, 30), "•", fontsize=8, fontname="F0")      # 带内,跨页重复
+        page.insert_text((60, 150), "•", fontsize=10, fontname="F0")   # 正文区,独立一行
+        page.insert_text((80, 150), f"body bullet item {pno + 1}", fontsize=10)
+        for i in range(6):
+            page.insert_text((60, 200 + i * 20),
+                             f"body line {pno + 1}-{i} of running text", fontsize=10)
+    doc.save(str(path))
+    doc.close()
+
+
+ZERO_WIDTH_SPACE = "​"
+
+
+def build_pdf_with_zero_width_chars(path, npages=1):
+    """R3 回归夹具:文本里夹着零宽空格(飞书导出常见)。调用前请先用
+    unicode_font_path() 探测字体是否可用,不可用则应 skip 该测试。
+    """
+    font = unicode_font_path()
+    doc = fitz.open()
+    for pno in range(npages):
+        page = doc.new_page(width=A4_W, height=A4_H)
+        page.insert_font(fontname="F0", fontfile=font)
+        page.insert_text(
+            (60, 100),
+            f"body{ZERO_WIDTH_SPACE}line with zero{ZERO_WIDTH_SPACE}width space",
+            fontsize=10, fontname="F0")
     doc.save(str(path))
     doc.close()
 

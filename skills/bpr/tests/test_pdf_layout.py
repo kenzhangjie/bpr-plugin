@@ -9,7 +9,11 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts" /
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import pdf_layout as pl
-from pdf_fixtures import build_band_content_pdf, build_report_pdf
+import pytest
+
+from pdf_fixtures import (build_band_content_pdf, build_bullet_everywhere_pdf,
+                          build_pdf_with_zero_width_chars, build_report_pdf,
+                          unicode_font_path)
 
 
 def test_norm_hf_replaces_digits_and_strips():
@@ -166,6 +170,40 @@ def test_page_lines_drops_repeated_hf(tmp_path):
     assert "REPEATED FOOTER LINE" not in texts
     # 只出现在单页的带内行仍在结果里
     assert "unique top beta" in texts
+
+
+def test_page_lines_running_hf_filter_is_position_aware(tmp_path):
+    """R1 回归钉:同一文本('•')既跨页重复出现在带内、也出现在正文区。
+
+    过滤必须同时满足「位置落在带内」且「文本在 drop_set 里」才删——只看文本
+    会把正文里同形的行也删掉(实测:'•' 被判成页眉模式后,239 行 '•' 被删,
+    219 行来自正文区)。修复前此断言必然失败:带内、正文区的 '•' 会被一起删空。
+    """
+    if unicode_font_path() is None:
+        pytest.skip("本机找不到能保留 '•' 编码的 Unicode 字体,跳过")
+    p = tmp_path / "bullet.pdf"
+    build_bullet_everywhere_pdf(p, npages=5)
+    doc = fitz.open(p)
+    drop = pl.find_repeated_hf(doc)
+    assert "•" in drop     # 前提:'•' 确实被判成跨页重复的页眉模式
+    texts = [l[4] for l in pl.page_lines(doc[1], drop)]
+    doc.close()
+    assert texts.count("•") == 1              # 带内那条被删,正文区那条保留
+    assert "body bullet item 2" in texts       # 正文其余内容原样保留
+
+
+def test_content_lines_strips_zero_width_chars(tmp_path):
+    """R3 回归钉:零宽空格(飞书导出常见)不许原样进产出行文本。"""
+    if unicode_font_path() is None:
+        pytest.skip("本机找不到能保留零宽字符编码的 Unicode 字体,跳过")
+    p = tmp_path / "zw.pdf"
+    build_pdf_with_zero_width_chars(p)
+    doc = fitz.open(p)
+    texts = [l[4] for l in pl.content_lines(doc[0])]
+    doc.close()
+    assert texts
+    assert all("​" not in t for t in texts)
+    assert any("bodyline with zerowidth space" in t for t in texts)
 
 
 def test_join_lines_removes_hyphen_before_lowercase():

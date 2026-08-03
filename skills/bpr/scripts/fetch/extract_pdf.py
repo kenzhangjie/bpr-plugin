@@ -88,6 +88,14 @@ PDF_DATE_RE = re.compile(r"D:(\d{4})(\d{2})(\d{2})")
 JUNK_TITLE_RE = re.compile(
     r"(microsoft word|^untitled$|\.docx?$|\.pdf$|^\s*$)", re.IGNORECASE)
 
+# 导出工具的通用默认标题(飞书「Docs」、Word「无标题文档」等)。整串精确匹配
+# (strip + 小写后比较),不用子串匹配——否则会误杀含这些词的真标题,
+# 比如「Google Docs 使用指南」。
+JUNK_TITLE_EXACT = {
+    "docs", "doc", "document", "untitled", "untitled document",
+    "无标题", "无标题文档", "未命名", "新建文档", "新建文件",
+}
+
 ORG_TAIL_RE = re.compile(
     r"^.{2,40}?(研究部|研究所|研究院|证券|Research|Capital|Institute)\s*$",
     re.IGNORECASE | re.MULTILINE)
@@ -115,8 +123,11 @@ def parse_pdf_date(raw):
 
 
 def is_junk_title(text):
-    """Word 导出残留 / 文件名当标题 → 一律弃。"""
-    return bool(JUNK_TITLE_RE.search((text or "").strip()))
+    """Word 导出残留 / 文件名当标题 / 导出工具默认标题 → 一律弃。"""
+    stripped = (text or "").strip()
+    if stripped.lower() in JUNK_TITLE_EXACT:
+        return True
+    return bool(JUNK_TITLE_RE.search(stripped))
 
 
 def cover_max_font_text(page):
@@ -409,6 +420,14 @@ def run(pdf_path, workdir, truncate=True, tables_mode="img"):
     }
 
 
+def _truncate_value(value, limit=40):
+    """超长候选值截成 "...尾部",避免撑破固定列宽、跟下一列粘连。"""
+    s = str(value)
+    if len(s) <= limit:
+        return s
+    return "..." + s[-(limit - 3):]
+
+
 def _print_report(report):
     """所有「丢了内容」的行为都要在这里说出来。静默丢弃是头号禁忌。"""
     print(f"模式         {report['mode']}(text_ratio={report['text_ratio']})")
@@ -431,12 +450,17 @@ def _print_report(report):
     print()
     print("元数据(请确认,有误直接告诉我改哪一项):")
     print(f"  {'字段':<14}{'候选值':<34}{'来源':<26}置信度")
-    for key in ("title", "publication", "date", "source_slug", "canonical"):
+    for key in ("title", "publication", "date", "source_slug"):
         value = report["meta"].get(key)
-        source = report["meta"]["source"] if key == "date" else (
-            "local-path" if key == "canonical" else "derived")
+        source = report["meta"]["source"] if key == "date" else "derived"
         conf = report["confidence"].get(key, "—")
-        print(f"  {key:<14}{str(value):<34}{source:<26}{conf}")
+        print(f"  {key:<14}{_truncate_value(value):<34}{source:<26}{conf}")
+    # canonical 是绝对路径,常年超出候选值列宽(尤其含中文文件名时,CJK 字符
+    # 视觉宽度与 len() 不等),硬塞进同一列会跟"来源"粘连成一团(实测)。
+    # 单独打一行、值不截断,路径才始终可辨认。
+    conf = report["confidence"].get("canonical", "—")
+    print(f"  {'canonical':<14}{report['meta'].get('canonical')}")
+    print(f"  {'':<14}来源: local-path   置信度: {conf}")
 
 
 def main(argv=None):

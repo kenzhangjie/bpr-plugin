@@ -16,6 +16,11 @@ HF_MIN_PAGES = 4        # 少于这么多页就不做重复检测(样本不足)
 
 NUM_RE = re.compile(r"\d+")
 
+# 零宽空格 / 零宽连字 / 零宽非连字 / BOM(零宽不换行空格)—— 飞书等导出工具
+# 常在文本里夹带这些码位。它们会原样进 body.txt 污染下游阅读 HTML,还会破坏
+# norm_hf 的等值比较(视觉相同的两行因零宽字符不同而不相等)。
+ZERO_WIDTH_RE = re.compile(r"[​‌‍﻿]")
+
 
 def norm_hf(text):
     """归一化页眉页脚文本:数字全替成 # ,两端去空白。
@@ -31,7 +36,8 @@ def _iter_lines(page):
         if blk.get("type") != 0:        # type 0 = 文本块,1 = 图像块
             continue
         for line in blk["lines"]:
-            text = "".join(s["text"] for s in line["spans"]).strip()
+            raw = "".join(s["text"] for s in line["spans"])
+            text = ZERO_WIDTH_RE.sub("", raw).strip()
             if not text:
                 continue
             x0, y0, x1, y1 = line["bbox"]
@@ -127,7 +133,20 @@ def page_lines(page, drop_set):
     双栏排序规则:以通栏行的 y 把页面切成 band,band 内先左栏(y 序)再右栏(y 序),
     通栏行本身排在其 band 之首。
     """
-    lines = [l for l in content_lines(page) if norm_hf(l[4]) not in drop_set]
+    top, bot = _bands(page)
+
+    def _is_running_hf(line):
+        """running header/footer = 文本跨页重复 且 位置在带内。
+
+        两个条件必须同时成立 —— 只看文本会把正文里同形的行也删掉(实测:
+        列表项目符号 '•' 被 fitz 切成独立一行,恰好落在带内的那些被判定为
+        跨页重复的页眉模式,若不看位置,全文所有内容为 '•' 的行都会被删,
+        其中大多数其实是正文区里的真列表项)。
+        """
+        in_band = line[3] <= top or line[1] >= bot
+        return in_band and norm_hf(line[4]) in drop_set
+
+    lines = [l for l in content_lines(page) if not _is_running_hf(l)]
     gutter = find_gutter(page)
     if gutter is None:
         return sorted(lines, key=lambda l: (round(l[1], 1), l[0]))

@@ -104,6 +104,16 @@ def test_is_junk_title_rejects_word_export_artifacts():
     assert ep.is_junk_title("中国AI算力产业深度报告") is False
 
 
+def test_is_junk_title_rejects_export_tool_default_titles():
+    """R2:飞书等导出工具的默认标题('Docs'/'无标题'…)必须一律弃,整串精确匹配。"""
+    assert ep.is_junk_title("Docs") is True
+    assert ep.is_junk_title("无标题") is True
+    assert ep.is_junk_title("Untitled Document") is True
+    assert ep.is_junk_title("韩国 UGC 平台内容审核风险说明") is False
+    # 含 "Docs" 但不是整串精确匹配,不能被误杀
+    assert ep.is_junk_title("Google Docs 使用指南") is False
+
+
 def test_cover_max_font_text_picks_largest_span(tmp_path):
     p = tmp_path / "r.pdf"
     build_report_pdf(p, npages=5)
