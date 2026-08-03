@@ -532,15 +532,18 @@ def join_lines(prev, nxt):
     """拼接相邻两行。
 
     - 行尾 '-' 且下行以小写字母开头 → 去连字符直接拼(PDF 换行断词)
-    - 任一侧是 CJK → 不补空格
-    - 其余 → 补一个空格
+    - 行尾 '-' 且下行非小写      → 保留连字符,直接拼不补空格(Sino-US 这类复合专名)
+    - 任一侧是 CJK               → 不补空格
+    - 其余                       → 补一个空格
     """
     if not prev:
         return nxt
     if not nxt:
         return prev
-    if prev.endswith("-") and nxt[:1].islower() and nxt[:1].isascii():
-        return prev[:-1] + nxt
+    if prev.endswith("-"):
+        if nxt[:1].islower() and nxt[:1].isascii():
+            return prev[:-1] + nxt
+        return prev + nxt
     if _is_cjk(prev[-1]) or _is_cjk(nxt[0]):
         return prev + nxt
     return prev + " " + nxt
@@ -685,8 +688,12 @@ def test_probe_access_ok_for_normal_pdf(tmp_path):
     d.close()
 
 
-def test_probe_access_distinguishes_scanned_from_perm_locked(tmp_path):
-    """无文字且无字体 = 扫描件;有字体但取不到文字 = 权限锁。两者要分开报。"""
+def test_probe_access_reports_scanned_for_blank_pages(tmp_path):
+    """无文字且无字体 → scanned。
+
+    (perm_locked 的另一侧无法用 fitz 合成——需要「有字体却取不到文字」,
+     合成不出来。该分支靠 Task 10 的真研报实测覆盖,此处不假造。)
+    """
     doc = fitz.open()
     doc.new_page()          # 纯空白页:无文字、无字体
     p = tmp_path / "blank.pdf"
