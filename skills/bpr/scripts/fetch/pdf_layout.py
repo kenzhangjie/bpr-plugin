@@ -88,6 +88,25 @@ def find_repeated_hf(doc):
     return {t for t, c in counter.items() if c >= n * HF_THRESHOLD}
 
 
+def find_page_ubiquitous_text(doc, threshold=HF_THRESHOLD):
+    """跨整页(不限页眉页脚带)重复出现的文本集合(已归一化)。
+
+    水印 / 品牌 running 元素常年印在页面中部,不在 find_repeated_hf 只看的
+    上下 8% 带内,所以需要一个不设位置限制的版本。用于把这类文本排除在
+    「封面最大字号候选」之外。
+
+    页数 < 2 时返回空集:少于 2 页无法判定「跨页重复」,唯一一页里的任何
+    文字都会 100% 满足阈值,那不是重复,是文档只有一页。
+    """
+    n = doc.page_count
+    if n < 2:
+        return set()
+    counter = Counter()
+    for page in doc:
+        counter.update({norm_hf(l[4]) for l in content_lines(page)})  # set:同页只算一次
+    return {t for t, c in counter.items() if c >= n * threshold}
+
+
 WIDE_RATIO = 0.40       # 行宽 > 页宽 40% → 视为通栏,不参与 gutter 聚类
 MIN_PER_COL = 3         # gutter 两侧各至少这么多行
 MIN_GUTTER = 8.0        # 栏间空隙至少 8pt

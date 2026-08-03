@@ -12,7 +12,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import extract_pdf as ep
 from pdf_fixtures import (build_band_content_pdf, build_pdf_with_blank_pages,
                           build_pdf_with_disclaimer, build_pdf_with_table,
-                          build_report_pdf)
+                          build_report_pdf, unicode_font_path)
 
 
 def test_is_pdf_true_for_real_pdf(tmp_path):
@@ -122,6 +122,33 @@ def test_cover_max_font_text_picks_largest_span(tmp_path):
     d.close()
 
 
+def test_cover_max_font_text_joins_multi_span_line(tmp_path):
+    """实测('韩国 UGC 平台内容审核风险说明.pdf'):中英混排的标题因字体切换被
+    fitz 拆成多个 span('韩国 ' / 'UGC ' / '报告标题'),但它们仍是同一行
+    (同一 bbox y 区间)。cover_max_font_text 必须返回整行拼接后的文本,
+    不能只返回其中一个 span。
+
+    用不同 fontname 的相邻 insert_text 调用重现这个切分:同字体、相邻位置
+    的两次调用会被 fitz 合并成单 span(实测验证过),换字体才会真正切出多
+    span 但仍归为一行——这与真实 PDF 里 CJK/Latin 字体切换的成因一致。
+    """
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_text((60, 200), "韩国 ", fontsize=20, fontname="china-s")
+    page.insert_text((110, 200), "UGC ", fontsize=20, fontname="helv")
+    page.insert_text((160, 200), "报告标题", fontsize=20, fontname="china-s")
+    p = tmp_path / "multispan.pdf"
+    doc.save(str(p))
+    doc.close()
+
+    d = fitz.open(p)
+    # 前提断言:确实被切成了多个 span,而非我们要验证的行为本身。
+    line = d[0].get_text("dict")["blocks"][0]["lines"][0]
+    assert len(line["spans"]) == 3
+    assert ep.cover_max_font_text(d[0]) == "韩国 UGC 报告标题"
+    d.close()
+
+
 def test_find_cover_date_chinese_full():
     assert ep.find_cover_date("发布日期 2026年7月15日 中金公司") == "2026-07-15"
 
@@ -207,6 +234,50 @@ def test_build_metadata_rejects_junk_info_title(tmp_path):
     meta, conf = ep.build_metadata(d, p)
     d.close()
     assert meta["title"] == "中国AI算力产业深度报告"
+
+
+def test_cover_max_font_text_strips_zero_width_chars(tmp_path):
+    """真实 PDF 实测暴露('韩国 UGC 平台内容审核风险说明.pdf'):标题行尾带
+    U+200B(飞书等导出工具常见)。cover_max_font_text 自己拼行文本,没有走
+    pdf_layout._iter_lines 那条已有的零宽字符剔除,原样漏进了标题。
+    """
+    font = unicode_font_path()
+    if font is None:
+        pytest.skip("本机找不到能保留零宽字符编码的 Unicode 字体,跳过")
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_font(fontname="F0", fontfile=font)
+    page.insert_text((60, 200), "真实标题​", fontsize=20, fontname="F0")
+    p = tmp_path / "zw.pdf"
+    doc.save(str(p))
+    doc.close()
+
+    d = fitz.open(p)
+    assert ep.cover_max_font_text(d[0]) == "真实标题"
+    d.close()
+
+
+def test_build_metadata_excludes_cross_page_watermark_from_title(tmp_path):
+    """缺陷 A 回归钉:水印字号比真标题大、且跨页(此处每页)重复,不能被当成标题。
+
+    实测('韩国 UGC 平台内容审核风险说明.pdf',22 页):品牌水印 52.6pt 出现在
+    22/22 页,真标题 25.5pt 只在封面出现 0 次跨页重复。修复前 cover_max_font_text
+    只看字号最大,必然选中水印——此断言在修复前会失败,断言值是 "WATERMARK"。
+    """
+    doc = fitz.open()
+    for pno in range(5):
+        page = doc.new_page(width=595, height=842)
+        page.insert_text((60, 400), "WATERMARK", fontsize=40)
+        if pno == 0:
+            page.insert_text((60, 200), "真实报告标题", fontsize=20, fontname="china-s")
+    p = tmp_path / "watermark.pdf"
+    doc.save(str(p))
+    doc.close()
+
+    d = fitz.open(p)
+    meta, conf = ep.build_metadata(d, p)
+    d.close()
+    assert meta["title"] == "真实报告标题"
 
 
 def test_build_metadata_always_has_exactly_seven_keys(tmp_path):

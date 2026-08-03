@@ -130,17 +130,34 @@ def is_junk_title(text):
     return bool(JUNK_TITLE_RE.search(stripped))
 
 
-def cover_max_font_text(page):
-    """封面上字号最大的那段文字,通常就是报告标题。"""
+def cover_max_font_text(page, exclude=None):
+    """封面上字号最大、且不在排除集合里的那一整行文字,通常就是报告标题。
+
+    行级而非 span 级:中英混排常被 fitz 切成多个 span(如「韩国」/「UGC」/
+    「平台内容审核风险说明」三段),只取单个 span 拿不到完整标题,取整行
+    才是完整候选文本。行字号取该行内 span 的最大值。
+
+    exclude:已归一化(pdf_layout.norm_hf)的文本集合,通常是
+    find_page_ubiquitous_text 找出的跨页重复文本(水印等 running 元素)——
+    这些字号可能比真标题还大,必须先排除才轮到真标题。默认 None 不排除。
+    """
+    if exclude is None:
+        exclude = set()
     best_size, best_text = 0.0, None
     for block in page.get_text("dict")["blocks"]:
         if block.get("type") != 0:
             continue
         for line in block["lines"]:
-            for span in line["spans"]:
-                text = span["text"].strip()
-                if text and span["size"] > best_size:
-                    best_size, best_text = span["size"], text
+            spans = line["spans"]
+            raw = "".join(span["text"] for span in spans)
+            # 与 pdf_layout._iter_lines 一致:飞书等导出工具常在文本里夹带
+            # 零宽字符,不剔除会原样进 title(实测该 PDF 标题行尾带 U+200B)。
+            text = layout.ZERO_WIDTH_RE.sub("", raw).strip()
+            if not text or layout.norm_hf(text) in exclude:
+                continue
+            size = max((span["size"] for span in spans), default=0.0)
+            if size > best_size:
+                best_size, best_text = size, text
     return best_text
 
 
@@ -192,7 +209,13 @@ def build_metadata(doc, pdf_path):
     if info_title and not is_junk_title(info_title):
         title, confidence["title"] = info_title, "high"
     else:
-        title = cover_max_font_text(cover) if cover is not None else None
+        # 只在需要回落到封面提取时才算跨页重复文本(水印等):这一步要遍历
+        # 全文档,/Info 里已有干净标题的常规情况不该多付这个代价。
+        if cover is not None:
+            exclude = layout.find_page_ubiquitous_text(doc)
+            title = cover_max_font_text(cover, exclude)
+        else:
+            title = None
         confidence["title"] = "medium" if title else "low"
 
     org = find_org_name(cover_text) or (info.get("author") or "").strip() or None
