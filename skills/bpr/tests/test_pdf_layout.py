@@ -56,3 +56,62 @@ def test_find_repeated_hf_skips_short_documents(tmp_path):
     hf = pl.find_repeated_hf(doc)
     doc.close()
     assert hf == set()
+
+
+def test_find_gutter_detects_two_columns(tmp_path):
+    p = tmp_path / "two.pdf"
+    build_report_pdf(p, npages=5, two_col=True)
+    doc = fitz.open(p)
+    g = pl.find_gutter(doc[1])
+    doc.close()
+    assert g is not None
+    # 左栏文字止于 x≈212,右栏起于 x=320,分界必须落在两者之间
+    assert 212 < g < 320
+
+
+def test_find_gutter_returns_none_for_single_column(tmp_path):
+    """单栏文档正文右侧有大片空白,不能把它当成 gutter。"""
+    p = tmp_path / "one.pdf"
+    build_report_pdf(p, npages=5, two_col=False)
+    doc = fitz.open(p)
+    g = pl.find_gutter(doc[1])
+    doc.close()
+    assert g is None
+
+
+def test_page_lines_two_column_reading_order(tmp_path):
+    """双栏页:通栏标题在最前,左栏全部行先于右栏全部行。"""
+    p = tmp_path / "two.pdf"
+    build_report_pdf(p, npages=5, two_col=True)
+    doc = fitz.open(p)
+    drop = pl.find_repeated_hf(doc)
+    texts = [l[4] for l in pl.page_lines(doc[1], drop)]
+    doc.close()
+
+    assert texts[0].startswith("Heading 2")
+    lefts = [i for i, t in enumerate(texts) if t.startswith("left")]
+    rights = [i for i, t in enumerate(texts) if t.startswith("right")]
+    assert len(lefts) == 6 and len(rights) == 6
+    assert max(lefts) < min(rights)
+
+
+def test_page_lines_single_column_keeps_y_order(tmp_path):
+    p = tmp_path / "one.pdf"
+    build_report_pdf(p, npages=5, two_col=False)
+    doc = fitz.open(p)
+    drop = pl.find_repeated_hf(doc)
+    texts = [l[4] for l in pl.page_lines(doc[1], drop)]
+    doc.close()
+    assert texts[0].startswith("Heading 2")
+    assert [t for t in texts if t.startswith("left")] == [
+        f"left p2 line{i} text" for i in range(6)]
+
+
+def test_page_lines_drops_repeated_hf(tmp_path):
+    p = tmp_path / "r.pdf"
+    build_report_pdf(p, npages=5)
+    doc = fitz.open(p)
+    drop = pl.find_repeated_hf(doc)
+    texts = [l[4] for l in pl.page_lines(doc[1], drop)]
+    doc.close()
+    assert not any("中金" in t or "免责" in t for t in texts)
