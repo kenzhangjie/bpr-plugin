@@ -1814,6 +1814,16 @@ block 级的「通栏」判据会把所有合并后的正文块**全部误判成
 `docs/superpowers/specs/2026-08-03-bpr-pdf-input-design.md`。
 ```
 
+- [ ] **Step 6c: 修 `--tables md` 的 help 文案(它现在是句假话)**
+
+Task 8 交付的 `argparse` help 写的是 `md=表格转 markdown 留在正文`,但阶段 1 的 `md` 模式实际行为只是"不收集表格、因而不剔除表格文本",并没有把表格转成 markdown 插回正文(真正的 markdown 回填在阶段 2)。`--help` 里的描述必须与实际行为一致。
+
+把 `extract_pdf.py` 里 `--tables` 那个 `add_argument` 的 help 改成:
+
+```
+help="img=表格当图(默认,剔正文留锚) md=保留表格原始文字于正文(阶段 1 暂不转 markdown)"
+```
+
 - [ ] **Step 6b: 修 `pdf_layout.py` docstring 里的悬空引用**
 
 Task 1 的模块 docstring 照抄了计划初稿的错误引用(指向 L5,而 L5 是 macOS 大小写那条)。Step 6 建好 L8 后,把该行改对:
