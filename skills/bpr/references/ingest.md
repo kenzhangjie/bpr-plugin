@@ -347,7 +347,7 @@ python3 scripts/fetch/extract_pdf.py "<path.pdf>" --workdir "$WORKDIR"
 
 把 `body.txt` 当 essay 正文输入,`metadata.json` 供 hero kicker 与文件名。之后 PREP 按 CJK 占比自动选中文浓缩 / 英文双语,与其他来源一致。
 
-> **表格**:默认 `--tables img`,表格文本从 `body.txt` 剔除并留 `[[table:pN-i]]` 锚记,由阶段 2 抽成图填回。想要 markdown 表格用 `--tables md`。
+> **表格**:默认 `--tables img`,表格文本从 `body.txt` 剔除并留 `[[table:pN-i]]` 锚记,由阶段 2 抽成图填回。`--tables md` 目前只是**不剔除**表格原文(原样留在正文里),阶段 1 **不产出真正的 markdown 表格** —— markdown 回填在阶段 2。
 
 ---
 
