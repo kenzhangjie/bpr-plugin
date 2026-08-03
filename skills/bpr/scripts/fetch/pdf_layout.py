@@ -7,6 +7,7 @@ x 判据都拿不到栏边界(2026-08-03 实测)。见 references/lessons-learne
 from __future__ import annotations
 
 import re
+import statistics
 from collections import Counter
 
 HF_BAND = 0.08          # 页眉页脚带:上下各占页高比例
@@ -134,3 +135,66 @@ def page_lines(page, drop_set):
         out.extend(sorted((l for l in left if lo < l[1] < hi), key=lambda l: l[1]))
         out.extend(sorted((l for l in right if lo < l[1] < hi), key=lambda l: l[1]))
     return out
+
+
+GAP_FACTOR = 1.3        # 行距 > 中位行距 × 此值 → 段落边界
+
+CJK_RE = re.compile(r"[　-〿一-鿿＀-￯]")
+
+
+def _is_cjk(ch):
+    return bool(CJK_RE.match(ch))
+
+
+def join_lines(prev, nxt):
+    """拼接相邻两行。
+
+    - 行尾 '-' 且下行以小写字母开头 → 去连字符直接拼(PDF 换行断词)
+    - 行尾 '-' 且下行非小写      → 保留连字符,直接拼不补空格(Sino-US 这类复合专名)
+    - 任一侧是 CJK               → 不补空格
+    - 其余                       → 补一个空格
+    """
+    if not prev:
+        return nxt
+    if not nxt:
+        return prev
+    if prev.endswith("-"):
+        if nxt[:1].islower() and nxt[:1].isascii():
+            return prev[:-1] + nxt
+        return prev + nxt
+    if _is_cjk(prev[-1]) or _is_cjk(nxt[0]):
+        return prev + nxt
+    return prev + " " + nxt
+
+
+def lines_to_paragraphs(lines, gap_factor=GAP_FACTOR):
+    """5 元组行列表(已按阅读顺序)→ 段落字符串列表。
+
+    段落边界两种:
+      1) 相邻行 y 间距 > 中位行距 × gap_factor
+      2) y 回跳(delta <= 0)= 换栏或换页,强制断段
+    """
+    if not lines:
+        return []
+    if len(lines) == 1:
+        return [lines[0][4]]
+
+    deltas = []
+    for i in range(len(lines) - 1):
+        d = lines[i + 1][1] - lines[i][1]
+        if d > 0:
+            deltas.append(d)
+    median = statistics.median(deltas) if deltas else 0.0
+    limit = median * gap_factor if median else float("inf")
+
+    paragraphs = []
+    current = lines[0][4]
+    for i in range(1, len(lines)):
+        delta = lines[i][1] - lines[i - 1][1]
+        if delta <= 0 or delta > limit:
+            paragraphs.append(current)
+            current = lines[i][4]
+        else:
+            current = join_lines(current, lines[i][4])
+    paragraphs.append(current)
+    return paragraphs

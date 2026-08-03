@@ -115,3 +115,53 @@ def test_page_lines_drops_repeated_hf(tmp_path):
     texts = [l[4] for l in pl.page_lines(doc[1], drop)]
     doc.close()
     assert not any("中金" in t or "免责" in t for t in texts)
+
+
+def test_join_lines_removes_hyphen_before_lowercase():
+    assert pl.join_lines("infra-", "structure spending") == "infrastructure spending"
+
+
+def test_join_lines_keeps_hyphen_before_uppercase():
+    """行尾连字符 + 下行大写,通常是复合专名(如 Sino-US),不能吃掉连字符。"""
+    assert pl.join_lines("Sino-", "US trade") == "Sino-US trade"
+
+
+def test_join_lines_no_space_between_cjk():
+    assert pl.join_lines("中国算力", "产业规模") == "中国算力产业规模"
+
+
+def test_join_lines_space_between_ascii_words():
+    assert pl.join_lines("total addressable", "market size") == \
+        "total addressable market size"
+
+
+def test_lines_to_paragraphs_breaks_on_large_vertical_gap():
+    # 行距 12,第 3 行前留 40 的大间距 → 应切成两段
+    lines = [
+        (60, 100, 200, 110, "first para line one"),
+        (60, 112, 200, 122, "first para line two"),
+        (60, 152, 200, 162, "second para starts"),
+    ]
+    paras = pl.lines_to_paragraphs(lines)
+    assert len(paras) == 2
+    assert paras[0] == "first para line one first para line two"
+    assert paras[1] == "second para starts"
+
+
+def test_lines_to_paragraphs_breaks_on_column_switch():
+    """y 回跳 = 换栏,必须强制断段,否则左栏末句会和右栏首句黏在一起。"""
+    lines = [
+        (60, 300, 200, 310, "left column last line"),
+        (320, 100, 460, 110, "right column first line"),
+    ]
+    paras = pl.lines_to_paragraphs(lines)
+    assert paras == ["left column last line", "right column first line"]
+
+
+def test_lines_to_paragraphs_single_line():
+    paras = pl.lines_to_paragraphs([(60, 100, 200, 110, "only line")])
+    assert paras == ["only line"]
+
+
+def test_lines_to_paragraphs_empty():
+    assert pl.lines_to_paragraphs([]) == []
