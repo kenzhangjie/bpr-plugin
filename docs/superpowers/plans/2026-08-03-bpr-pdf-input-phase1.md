@@ -1787,13 +1787,43 @@ python3 scripts/fetch/extract_pdf.py "<path.pdf>" --workdir "$WORKDIR"
 - 本地 PDF 报「已截断 N 页」:复核是否误截真正文,必要时 `--no-truncate` 重跑。
 ```
 
-- [ ] **Step 6: `lessons-learned.md` 新增 L5**
+- [ ] **Step 6: `lessons-learned.md` 新增 L8**
+
+> **注意编号**:该文件已有 L1–L7(`L5` 是 macOS 大小写不敏感 FS 那条,`references/lessons-learned.md:215`)。**新条目必须是 L8**,不要覆盖 L5。
+
+在文件末尾追加,与现有条目同格式(`## L8 · 标题 (日期)`):
 
 ```markdown
-- **L5 PDF 分栏只能在 line 级做**:`page.get_text("blocks")` 会把**同一基线上的左右栏文字合并进同一个 block**,栏在 block 内部就已经糊在一起——任何 block 级的 x 判据都拿不到栏边界,而且 block 级的「通栏」判据会把所有合并后的正文块误判成通栏。必须用 `get_text("dict")` 的 `blocks[].lines[]`(每行带 bbox)。
-  另:**研报图表大多是矢量而非位图**,`page.get_images()` 会静默返回空(Wind / Excel 导出的图在 PDF 里是填充矩形与 path)。必须靠 `get_drawings()` 的 bbox 聚类 + `get_pixmap(clip=bbox)` 区域截图。
-  两条都是 2026-08-03 实测结论,见 `docs/superpowers/specs/2026-08-03-bpr-pdf-input-design.md`。
+## L8 · PDF 分栏只能在 line 级做 + 研报图表是矢量的 (2026-08-03)
+
+**踩坑一:block 级分栏行不通。**
+`page.get_text("blocks")` 会把**同一基线上的左右栏文字合并进同一个 block** ——
+栏在 block 内部就已经糊在一起,任何 block 级的 x 判据都拿不到栏边界。更糟的是
+block 级的「通栏」判据会把所有合并后的正文块**全部误判成通栏**,结果左右栏交替串成一片。
+
+**修法**:全程用 `get_text("dict")` 的 `blocks[].lines[]`(每行带 bbox)。先滤掉宽度
+> 页宽 40% 的宽行(通栏标题会填平真空隙),再按行 `x0` 找最大间隙定 gutter,
+且要求 gutter 两侧各有 ≥3 行——少了这条约束,单栏文档正文右侧的大片空白会被当成 gutter。
+
+**踩坑二:研报图表大多是矢量而非位图。**
+`page.get_images()` 对 Wind / Excel 导出的图表会**静默返回空**(它们在 PDF 里是填充矩形
+与 path,不是嵌入位图)。必须靠 `get_drawings()` 的 bbox 聚类 + `get_pixmap(clip=bbox)`
+做区域截图。静默零结果比报错更危险——不检查 coverage 就会以为「这份 PDF 没图」。
+
+两条都是 2026-08-03 用合成 PDF 实测的结论,详见
+`docs/superpowers/specs/2026-08-03-bpr-pdf-input-design.md`。
 ```
+
+- [ ] **Step 6b: 修 `pdf_layout.py` docstring 里的悬空引用**
+
+Task 1 的模块 docstring 照抄了计划初稿的错误引用(指向 L5,而 L5 是 macOS 大小写那条)。Step 6 建好 L8 后,把该行改对:
+
+```bash
+cd ~/dev/bpr-pdf-input
+grep -n 'lessons-learned.md L5' skills/bpr/scripts/fetch/pdf_layout.py
+```
+
+把 `见 references/lessons-learned.md L5。` 改成 `见 references/lessons-learned.md L8。`
 
 - [ ] **Step 7: 确认没弄坏测试**
 
