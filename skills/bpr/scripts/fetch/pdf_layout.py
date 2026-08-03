@@ -2,7 +2,7 @@
 
 为什么全程在 line 级而不是 block 级:fitz 的 get_text("blocks") 会把同一基线上
 的左右栏文字合并进同一个 block,栏在 block 内部就已经糊在一起,任何 block 级的
-x 判据都拿不到栏边界(2026-08-03 实测)。见 references/lessons-learned.md L5。
+x 判据都拿不到栏边界(2026-08-03 实测)。见 references/lessons-learned.md L8。
 """
 from __future__ import annotations
 

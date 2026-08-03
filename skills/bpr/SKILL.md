@@ -17,7 +17,7 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 
 | 阶段 | 做什么 | 读哪个 reference / 用哪个脚本 |
 |---|---|---|
-| **1 · INGEST** | 解析输入:URL 预处理 + 提取发布日期/标题/作者;判输入类型(SRT / 带时间戳 transcript / 纯文本 transcript / blog essay)。文件名也在此阶段按元信息定。 | `references/ingest.md`(URL 处理 / 发布日期 / 文件名规则)· `scripts/fetch/*` |
+| **1 · INGEST** | 解析输入:URL 预处理 + 提取发布日期/标题/作者;判输入类型(SRT / 带时间戳 transcript / 纯文本 transcript / blog essay)。文件名也在此阶段按元信息定。 | `references/ingest.md`(URL 处理 / 发布日期 / 文件名规则)· `scripts/fetch/*`(含 `extract_pdf.py` 本地 PDF) |
 | **2 · PREP** | 预处理:合并跨条句、提取说话人、标注时间戳、auto-subs 重断句+加标点、VTT 滚动重建;**统计 CJK 占比 → 选模式**(≥60% 中文浓缩 / <60% 英文双语)。**英文子模式**:用 `description` 当 ground truth 做专名纠错 + 说话人归属 + 拆合并 `>>`(见 prep-and-modes.md);中文走 CLEAN。 | `references/prep-and-modes.md`(断句 + 中文模式判定与规范)· `scripts/fetch/clean_vtt.py` |
 | **3 · CLEAN** | **(仅中文模式)** ASR 后处理三步:Analyze 全稿定术语表+存疑清单 → 按 ~25 turn 切窗,子代理 Review(纠错)+ Polish(书面化)→ 产出书面正文,保留逐字底档。**各窗必须并发派发(批 ≤ 5),保真闸抽样**。英文模式跳过。 | `references/clean.md` |
 | **4 · STRUCTURE** | 章节切分 + 提炼 TL;DR(描述性 h2)+(中文模式)🔥 非共识 takes。规模按下方"自适应"表。 | `references/render.md`(TL;DR 4 元素 / 中文 2 元素格式)· 下方自适应表 |
@@ -68,3 +68,6 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 - > 50K 字:询问是否分文件。
 - YouTube auto-subs(无标点/无 speaker):PREP 先重断句+加标点;无法可靠分 speaker → 退化成 essay 模式渲染。
 - URL 输入细节 → `references/ingest.md`。
+- 本地 PDF 无文字层 / 文字层被权限锁:`extract_pdf.py` 退出码 3,需 OCR(阶段 3)。**不要**跳过这些页继续,会静默丢内容。
+- 本地 PDF > 200 页:询问是否分 part。
+- 本地 PDF 报「已截断 N 页」:复核是否误截真正文,必要时 `--no-truncate` 重跑。

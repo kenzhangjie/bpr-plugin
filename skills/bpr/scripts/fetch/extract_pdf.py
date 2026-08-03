@@ -429,7 +429,7 @@ def main(argv=None):
     parser.add_argument("--no-truncate", action="store_true",
                         help="不截断尾部免责声明")
     parser.add_argument("--tables", choices=("img", "md"), default="img",
-                        help="img=表格当图(默认,剔正文留锚) md=表格转 markdown 留在正文")
+                        help="img=表格当图(默认,剔正文留锚) md=保留表格原始文字于正文(阶段 1 暂不转 markdown)")
     args = parser.parse_args(argv)
 
     try:

@@ -298,3 +298,24 @@ macOS 默认 APFS 文件系统**大小写不敏感但保留(case-insensitive but
 5. **幂等**:`images/<stem>/.manifest.json` 记 `id→file`,re-run 复用不重下;`重抓图 / --refresh` 强制全重下。
 6. **step 7 覆盖率闸门加一条图片项**:`成功下载 / 正文候选图 < ~90%` → 报告显式警告,别默默交缺图版本。
 7. **Substack 类页面正文常重复两份**:抓图要扫全区域并**按图片 id 去重**(`extract_images.py` 已做),别只取第一份。
+
+---
+
+## L8 · PDF 分栏只能在 line 级做 + 研报图表是矢量的 (2026-08-03)
+
+**踩坑一:block 级分栏行不通。**
+`page.get_text("blocks")` 会把**同一基线上的左右栏文字合并进同一个 block** ——
+栏在 block 内部就已经糊在一起,任何 block 级的 x 判据都拿不到栏边界。更糟的是
+block 级的「通栏」判据会把所有合并后的正文块**全部误判成通栏**,结果左右栏交替串成一片。
+
+**修法**:全程用 `get_text("dict")` 的 `blocks[].lines[]`(每行带 bbox)。先滤掉宽度
+> 页宽 40% 的宽行(通栏标题会填平真空隙),再按行 `x0` 找最大间隙定 gutter,
+且要求 gutter 两侧各有 ≥3 行——少了这条约束,单栏文档正文右侧的大片空白会被当成 gutter。
+
+**踩坑二:研报图表大多是矢量而非位图。**
+`page.get_images()` 对 Wind / Excel 导出的图表会**静默返回空**(它们在 PDF 里是填充矩形
+与 path,不是嵌入位图)。必须靠 `get_drawings()` 的 bbox 聚类 + `get_pixmap(clip=bbox)`
+做区域截图。静默零结果比报错更危险——不检查 coverage 就会以为「这份 PDF 没图」。
+
+两条都是 2026-08-03 用合成 PDF 实测的结论,详见
+`docs/superpowers/specs/2026-08-03-bpr-pdf-input-design.md`。

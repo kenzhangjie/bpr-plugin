@@ -14,11 +14,13 @@
 | **Transcript with timestamps** | `[00:12:34]` / `(12:34)` 标记 | ✓ | `{podcast} · Episode · {year}` |
 | **Plain transcript** | 段首有 `Lenny:` / `Cat:` 等说话人 + 多说话人交替 | ✓ speaker,无 timestamp | `{podcast} with {Host} · {YYYY-MM-DD} · 双语整理` |
 | **Blog / Essay** | URL(claude.com/blog · pmarchive · substack · paulgraham.com 等)/ 单作者长文 markdown | ✗ 全部跳过 | `{publication} · Essay · {YYYY-MM-DD}` |
+| **本地 PDF** | `.pdf` 文件路径(研报 / 白皮书 / 书籍章节) | ✗ 全部跳过 | `{publication} · Report · {YYYY-MM-DD}` |
 
 判定逻辑:
 - 有时间码 → SRT 模式
 - `Speaker:` 模式 + 多说话人交替 → transcript 模式
 - 单作者、有章节标题、无说话人轮换 → **blog / essay 模式**(走 `.body-block` + `.bilingual` 路径,不渲染 `.turn / .speaker / .timestamp`)
+- 输入是本地 `.pdf` 路径 → **本地 PDF 模式**(走 `scripts/fetch/extract_pdf.py`,渲染上等同 blog / essay 模式)
 
 ## URL 输入处理
 
@@ -34,7 +36,7 @@
 | **Bilibili / B 站**(`bilibili.com/video/BV<id>` / `b23.tv/<short>`)| 走"小宇宙 / Bilibili → 飞书妙记 一站式流程"(下面),先尝试 yt-dlp 字幕,无字幕则下载音频走妙记 |
 | Apple Podcasts / Spotify / Overcast | 不能直接抓,先问用户能不能给 YouTube/小宇宙 URL(同期一般多平台都有) |
 | Paywall / 登录墙(WSJ / NYT / 付费 Substack)| curl 失败时**直接告诉用户**抓不到,让 ta 粘 raw text |
-| PDF 链接 | 让用户先下载到本地,再 `/bpr <文件路径>` |
+| PDF 链接 | 让用户先下载到本地,再 `/bpr <文件路径>` → 走下面「本地 PDF 一站式流程」 |
 
 ### 抓取命令(博客 / essay)
 
@@ -313,6 +315,39 @@ done
 | 转录质量差(说话人多 / 杂音多) | 妙记本身限制,接受。可在 BPR 翻译阶段适度修正明显错词 |
 | `--as user` vs `--as bot` | 妙记功能必须 `--as user`(bot 拿不到个人空间妙记) |
 | 文件超大上传失败 | `drive +upload` 默认支持分片;失败时检查 lark 上传额度 |
+
+### 本地 PDF 一站式流程
+
+**Step A · 解析**
+
+```bash
+WORKDIR=$(mktemp -d /tmp/bpr-pdf-XXXX)
+python3 scripts/fetch/extract_pdf.py "<path.pdf>" --workdir "$WORKDIR"
+```
+
+产物:
+- `body.txt` — 干净正文(已剥跨页重复的页眉页脚、已接行尾断词、双栏已按栏序拉直)
+- `pages.jsonl` — 每页一条 `{page, text, source}`,底档,查错字定位到页
+- `metadata.json` — 7 键,与 `extract_metadata.py` 同形
+- `tables.json` — 表格 bbox 单一真源,阶段 2 的 `extract_pdf_images.py` 读它
+
+**退出码**:`0` 成功 · `2` 输入非法(非 PDF / 已加密)· `3` 需要 OCR(无文字层或权限锁,走阶段 3 的 `ocr_pdf.py`)。
+
+**Step B · 元数据确认(必做,不要跳)**
+
+脚本会打一张「字段 / 候选值 / 来源 / 置信度」表。**发布日期必须来自封面正文,不是 PDF 的 CreationDate**——CreationDate 记的是文件何时生成,一份旧研报被重新导出就会变成今天,正好违反本文档「绝不静默用今天」那条。
+
+看到 `source` 为 `pdf:info-creationdate` 或 `pdf:none` 时,主动问用户要真实发布日期。
+
+**Step C · 截断与丢弃都要复核**
+
+脚本会报「剔除页眉页脚 N 条」「已截断从第 X 页起共 N 页」。研报尾部的免责声明该截,但**若截掉的页数明显偏多,加 `--no-truncate` 重跑**再人工判断。
+
+**Step D · 喂给正常流程**
+
+把 `body.txt` 当 essay 正文输入,`metadata.json` 供 hero kicker 与文件名。之后 PREP 按 CJK 占比自动选中文浓缩 / 英文双语,与其他来源一致。
+
+> **表格**:默认 `--tables img`,表格文本从 `body.txt` 剔除并留 `[[table:pN-i]]` 锚记,由阶段 2 抽成图填回。想要 markdown 表格用 `--tables md`。
 
 ---
 
