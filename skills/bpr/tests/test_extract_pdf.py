@@ -255,3 +255,53 @@ def test_strip_table_lines_noop_when_no_tables():
     kept, anchors = ep.strip_table_lines(lines, [])
     assert kept == lines
     assert anchors == 0
+
+
+def test_collect_tables_skips_malformed_page_with_warning(tmp_path, monkeypatch, capsys):
+    """畸形页的 find_tables() 抛异常时,该页被跳过但 stderr 有告警。"""
+    p = tmp_path / "t.pdf"
+    build_pdf_with_table(p, npages=2)
+    d = fitz.open(p)
+
+    # 让第 2 页的 find_tables() 抛 RuntimeError
+    orig_find_tables = fitz.Page.find_tables
+    call_count = [0]
+
+    def patched_find_tables(self):
+        call_count[0] += 1
+        if call_count[0] == 2:  # 第 2 页(1-indexed 第 2 页是 0-indexed 第 1 页)
+            raise RuntimeError("boom")
+        return orig_find_tables(self)
+
+    monkeypatch.setattr(fitz.Page, "find_tables", patched_find_tables)
+
+    tables = ep.collect_tables(d)
+    d.close()
+
+    # 验证:
+    # (a) 函数不抛异常
+    assert tables is not None
+    # (b) 第 1 页的表格在结果里,第 2 页没有(被跳过了)
+    assert len(tables) == 1
+    assert tables[0]["page"] == 1
+    # (c) stderr 有告警,含页号与异常类型
+    captured = capsys.readouterr()
+    assert "2" in captured.err
+    assert "RuntimeError" in captured.err
+
+
+def test_collect_tables_reraises_attribute_error(tmp_path, monkeypatch):
+    """AttributeError 不被吞,照常抛出(编程错误)。"""
+    p = tmp_path / "t.pdf"
+    build_pdf_with_table(p, npages=1)
+    d = fitz.open(p)
+
+    def boom_find_tables(self):
+        raise AttributeError("find_tables method missing")
+
+    monkeypatch.setattr(fitz.Page, "find_tables", boom_find_tables)
+
+    with pytest.raises(AttributeError):
+        ep.collect_tables(d)
+
+    d.close()

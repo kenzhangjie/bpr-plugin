@@ -219,7 +219,13 @@ def collect_tables(doc):
     for page_no, page in enumerate(doc, start=1):
         try:
             finder = page.find_tables()
-        except Exception:          # find_tables 对畸形页会抛,跳过该页而非整体失败
+        except AttributeError:
+            # AttributeError 标志编程错误(如未来重构时拼错方法名),不应吞掉
+            raise
+        except Exception as e:
+            # 畸形页导致的异常:跳过该页并打告警到 stderr
+            print(f"⚠ 第 {page_no} 页表格解析失败,已跳过该页表格({type(e).__name__})",
+                  file=sys.stderr)
             continue
         for index, table in enumerate(finder.tables):
             out.append({
