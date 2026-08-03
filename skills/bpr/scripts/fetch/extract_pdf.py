@@ -13,12 +13,15 @@
 """
 from __future__ import annotations
 
+import argparse
 import json
 import pathlib
 import re
 import sys
 
 import fitz
+
+import pdf_layout as layout
 
 MIN_PAGE_CHARS = 50        # 该页去空白后 ≥ 此字符数 → 算「有效文字页」
 TEXT_RATIO_HI = 0.8        # ≥ 此值 → 纯文字层
@@ -299,3 +302,146 @@ def find_disclaimer_page(page_texts):
         if DISCLAIMER_RE.search(text or ""):
             return page_no
     return None
+
+
+def run(pdf_path, workdir, truncate=True, tables_mode="img"):
+    """解析 PDF,把产物写进 workdir。返回报告 dict。"""
+    pdf_path = pathlib.Path(pdf_path)
+    if not is_pdf(pdf_path):
+        raise PdfInputError(f"不是 PDF 文件(magic 非 %PDF-): {pdf_path}", exit_code=2)
+
+    doc = fitz.open(str(pdf_path))
+    try:
+        if doc.needs_pass:
+            raise PdfInputError(
+                f"PDF 已加密: {pdf_path}。请先解密或提供密码。", exit_code=2)
+
+        access = probe_access(doc)
+        ratio = text_ratio(doc)
+        mode = detect_mode(ratio)
+
+        if access == "perm_locked":
+            raise PdfInputError(
+                f"文字层被权限锁(有字体但取不到文字): {pdf_path}。"
+                f"需要 OCR —— 走 scripts/fetch/ocr_pdf.py(阶段 3,尚未实现)。",
+                exit_code=3)
+        if mode == "scanned":
+            raise PdfInputError(
+                f"无文字层(text_ratio={ratio:.2f},疑似扫描件): {pdf_path}。"
+                f"需要 OCR —— 走 scripts/fetch/ocr_pdf.py(阶段 3,尚未实现)。",
+                exit_code=3)
+
+        need_ocr_pages = [i + 1 for i, page in enumerate(doc)
+                          if not page_has_text(page)]
+        if mode == "mixed" and need_ocr_pages:
+            raise PdfInputError(
+                f"混合模式:第 {need_ocr_pages} 页无文字层,需要 OCR 补齐 —— "
+                f"走 scripts/fetch/ocr_pdf.py(阶段 3,尚未实现)。"
+                f"跳过这些页会静默丢内容,故不继续。",
+                exit_code=3)
+
+        drop_set = layout.find_repeated_hf(doc)
+        tables = collect_tables(doc) if tables_mode == "img" else []
+        tables_by_page = {}
+        for entry in tables:
+            tables_by_page.setdefault(entry["page"], []).append(entry)
+
+        page_records, page_texts, anchors_total = [], [], 0
+        for page_no, page in enumerate(doc, start=1):
+            lines = layout.page_lines(page, drop_set)
+            lines, anchors = strip_table_lines(lines, tables_by_page.get(page_no, []))
+            anchors_total += anchors
+            paragraphs = layout.lines_to_paragraphs(lines)
+            text = "\n\n".join(paragraphs)
+            page_records.append({"page": page_no, "text": text, "source": "text"})
+            page_texts.append((page_no, text))
+
+        cut_at = find_disclaimer_page(page_texts) if truncate else None
+        truncated_pages = 0
+        if cut_at is not None:
+            truncated_pages = len(page_texts) - cut_at + 1
+            page_texts = [pt for pt in page_texts if pt[0] < cut_at]
+
+        body = "\n\n".join(text for _, text in page_texts if text).strip() + "\n"
+        meta, confidence = build_metadata(doc, pdf_path)
+        total_pages = doc.page_count
+    finally:
+        doc.close()
+
+    workdir = pathlib.Path(workdir)
+    workdir.mkdir(parents=True, exist_ok=True)
+    (workdir / "body.txt").write_text(body, encoding="utf-8")
+    with open(workdir / "pages.jsonl", "w", encoding="utf-8") as fh:
+        for record in page_records:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+    (workdir / "metadata.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (workdir / "tables.json").write_text(
+        json.dumps(tables, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    return {
+        "mode": mode,
+        "text_ratio": round(ratio, 3),
+        "pages": total_pages,
+        "chars": len(body),
+        "hf_dropped": len(drop_set),
+        "hf_texts": sorted(drop_set),
+        "tables": len(tables),
+        "table_anchors": anchors_total,
+        "truncated_from": cut_at,
+        "truncated_pages": truncated_pages,
+        "meta": meta,
+        "confidence": confidence,
+        "workdir": str(workdir),
+    }
+
+
+def _print_report(report):
+    """所有「丢了内容」的行为都要在这里说出来。静默丢弃是头号禁忌。"""
+    print(f"模式         {report['mode']}(text_ratio={report['text_ratio']})")
+    print(f"页数         {report['pages']}")
+    print(f"正文         {report['chars']} 字符 → {report['workdir']}/body.txt")
+    print(f"剔除页眉页脚  {report['hf_dropped']} 条")
+    for text in report["hf_texts"]:
+        print(f"             · {text}")
+    print(f"表格         {report['tables']} 个,正文留锚 {report['table_anchors']} 处"
+          f" → {report['workdir']}/tables.json")
+    if report["truncated_from"] is not None:
+        print(f"⚠ 已截断     从第 {report['truncated_from']} 页起共 "
+              f"{report['truncated_pages']} 页(命中免责声明类标题)。"
+              f"若误截请加 --no-truncate 重跑")
+    print()
+    print("元数据(请确认,有误直接告诉我改哪一项):")
+    print(f"  {'字段':<14}{'候选值':<34}{'来源':<26}置信度")
+    for key in ("title", "publication", "date", "source_slug", "canonical"):
+        value = report["meta"].get(key)
+        source = report["meta"]["source"] if key == "date" else (
+            "local-path" if key == "canonical" else "derived")
+        conf = report["confidence"].get(key, "—")
+        print(f"  {key:<14}{str(value):<34}{source:<26}{conf}")
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="PDF → 干净正文 + 元数据(BPR INGEST 本地 PDF 入口)")
+    parser.add_argument("pdf")
+    parser.add_argument("--workdir", required=True)
+    parser.add_argument("--no-truncate", action="store_true",
+                        help="不截断尾部免责声明")
+    parser.add_argument("--tables", choices=("img", "md"), default="img",
+                        help="img=表格当图(默认,剔正文留锚) md=表格转 markdown 留在正文")
+    args = parser.parse_args(argv)
+
+    try:
+        report = run(args.pdf, args.workdir,
+                     truncate=not args.no_truncate, tables_mode=args.tables)
+    except PdfInputError as exc:
+        print(f"✗ {exc}", file=sys.stderr)
+        return exc.exit_code
+
+    _print_report(report)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

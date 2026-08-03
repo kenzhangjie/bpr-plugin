@@ -341,3 +341,103 @@ def test_find_disclaimer_page_ignores_early_mention():
 def test_find_disclaimer_page_returns_none_when_absent():
     pages = [(1, "body one"), (2, "body two"), (3, "body three")]
     assert ep.find_disclaimer_page(pages) is None
+
+
+def test_run_writes_four_artifacts(tmp_path):
+    import json
+    pdf = tmp_path / "r.pdf"
+    build_report_pdf(pdf, npages=5)
+    work = tmp_path / "w"
+    report = ep.run(pdf, work)
+
+    assert (work / "body.txt").exists()
+    assert (work / "pages.jsonl").exists()
+    assert (work / "metadata.json").exists()
+    assert (work / "tables.json").exists()
+
+    meta = json.loads((work / "metadata.json").read_text(encoding="utf-8"))
+    assert set(meta) == {"date", "title", "author", "publication",
+                         "source_slug", "canonical", "source"}
+    assert report["mode"] == "text"
+
+
+def test_run_body_has_no_header_footer_residue(tmp_path):
+    pdf = tmp_path / "r.pdf"
+    build_report_pdf(pdf, npages=5)
+    work = tmp_path / "w"
+    ep.run(pdf, work)
+    body = (work / "body.txt").read_text(encoding="utf-8")
+    assert "中金公司研究部" not in body
+    assert "免责声明" not in body
+    assert "共 5 页" not in body
+
+
+def test_run_body_has_no_page_number_pollution(tmp_path):
+    """body.txt 必须干净;页码信息只进 pages.jsonl。"""
+    pdf = tmp_path / "r.pdf"
+    build_report_pdf(pdf, npages=5)
+    work = tmp_path / "w"
+    ep.run(pdf, work)
+    body = (work / "body.txt").read_text(encoding="utf-8")
+    assert "[[page" not in body
+
+
+def test_run_pages_jsonl_one_record_per_page(tmp_path):
+    import json
+    pdf = tmp_path / "r.pdf"
+    build_report_pdf(pdf, npages=5)
+    work = tmp_path / "w"
+    ep.run(pdf, work)
+    records = [json.loads(l) for l in
+               (work / "pages.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert len(records) == 5
+    assert records[0]["page"] == 1
+    assert records[0]["source"] == "text"
+
+
+def test_run_reports_dropped_header_footer_count(tmp_path):
+    """所有丢内容的行为都必须可被审计。"""
+    pdf = tmp_path / "r.pdf"
+    build_report_pdf(pdf, npages=5)
+    work = tmp_path / "w"
+    report = ep.run(pdf, work)
+    assert report["hf_dropped"] >= 2
+
+
+def test_run_raises_for_non_pdf(tmp_path):
+    p = tmp_path / "fake.pdf"
+    p.write_text("not a pdf")
+    with pytest.raises(ep.PdfInputError) as excinfo:
+        ep.run(p, tmp_path / "w")
+    assert excinfo.value.exit_code == 2
+
+
+def test_run_raises_for_scanned_pdf_pointing_at_phase3(tmp_path):
+    """阶段 1 不含 OCR:无文字层必须明确报错,绝不静默产出空正文。"""
+    doc = fitz.open()
+    for _ in range(4):
+        doc.new_page()
+    p = tmp_path / "blank.pdf"
+    doc.save(str(p))
+    doc.close()
+
+    with pytest.raises(ep.PdfInputError) as excinfo:
+        ep.run(p, tmp_path / "w")
+    assert excinfo.value.exit_code == 3
+    assert "ocr_pdf.py" in str(excinfo.value)
+
+
+def test_main_returns_zero_on_success(tmp_path, capsys):
+    pdf = tmp_path / "r.pdf"
+    build_report_pdf(pdf, npages=5)
+    code = ep.main([str(pdf), "--workdir", str(tmp_path / "w")])
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "body.txt" in out
+
+
+def test_main_returns_two_for_non_pdf(tmp_path, capsys):
+    p = tmp_path / "fake.pdf"
+    p.write_text("nope")
+    code = ep.main([str(p), "--workdir", str(tmp_path / "w")])
+    assert code == 2
