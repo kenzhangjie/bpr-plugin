@@ -271,3 +271,31 @@ def strip_table_lines(lines, tables_on_page):
         kept.append((line[0], line[1], line[2], line[3],
                      table_anchor(hit["page"], hit["index"])))
     return kept, anchors
+
+
+DISCLAIMER_RE = re.compile(
+    r"^\s*(免责声明|评级说明|分析师承诺|分析师声明|重要声明|法律声明|"
+    r"Disclaimer|Disclosures?|Important\s+Disclosures?)\s*$",
+    re.IGNORECASE | re.MULTILINE)
+
+DISCLAIMER_TAIL_FRACTION = 2.0 / 3.0    # 只在尾部三分之一里找
+
+
+def find_disclaimer_page(page_texts):
+    """返回免责声明起始页号,没有则 None。
+
+    page_texts: [(page_no, text), ...]
+
+    只认尾部三分之一:研报每页页脚都写「请务必阅读正文之后的免责声明部分」,
+    在正文前半段命中一定是那句提示语,截了会吃掉真正文。
+    """
+    total = len(page_texts)
+    if total < 2:
+        return None
+    threshold = total * DISCLAIMER_TAIL_FRACTION
+    for position, (page_no, text) in enumerate(page_texts, start=1):
+        if position <= threshold:
+            continue
+        if DISCLAIMER_RE.search(text or ""):
+            return page_no
+    return None

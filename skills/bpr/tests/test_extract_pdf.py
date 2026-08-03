@@ -305,3 +305,39 @@ def test_collect_tables_reraises_attribute_error(tmp_path, monkeypatch):
         ep.collect_tables(d)
 
     d.close()
+
+
+def test_find_disclaimer_page_detects_tail_section():
+    pages = [
+        (1, "正文第一页 讲行业规模"),
+        (2, "正文第二页 讲竞争格局"),
+        (3, "免责声明\n本报告仅供参考,不构成投资建议"),
+        (4, "分析师承诺\n本人具有中国证券业协会授予的证券投资咨询执业资格"),
+    ]
+    assert ep.find_disclaimer_page(pages) == 3
+
+
+def test_find_disclaimer_page_english():
+    pages = [
+        (1, "Body page one"),
+        (2, "Disclaimer\nThis report is for information purposes only"),
+    ]
+    assert ep.find_disclaimer_page(pages) == 2
+
+
+def test_find_disclaimer_page_ignores_early_mention():
+    """正文前半段提到「免责声明」(如页脚提示语)不算,只认尾部三分之一。"""
+    pages = [
+        (1, "请务必阅读正文之后的免责声明部分"),
+        (2, "正文第二页"),
+        (3, "正文第三页"),
+        (4, "正文第四页"),
+        (5, "正文第五页"),
+        (6, "正文第六页"),
+    ]
+    assert ep.find_disclaimer_page(pages) is None
+
+
+def test_find_disclaimer_page_returns_none_when_absent():
+    pages = [(1, "body one"), (2, "body two"), (3, "body three")]
+    assert ep.find_disclaimer_page(pages) is None
