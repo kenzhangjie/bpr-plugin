@@ -84,3 +84,116 @@ def test_probe_access_reports_scanned_for_blank_pages(tmp_path):
     d = fitz.open(p)
     assert ep.probe_access(d) == "scanned"
     d.close()
+
+
+def test_parse_pdf_date_handles_timezone_suffix():
+    assert ep.parse_pdf_date("D:20260801093000+08'00'") == "2026-08-01"
+
+
+def test_parse_pdf_date_returns_none_for_empty():
+    assert ep.parse_pdf_date("") is None
+    assert ep.parse_pdf_date(None) is None
+
+
+def test_is_junk_title_rejects_word_export_artifacts():
+    assert ep.is_junk_title("Microsoft Word - draft.doc") is True
+    assert ep.is_junk_title("untitled") is True
+    assert ep.is_junk_title("report.pdf") is True
+    assert ep.is_junk_title("中国AI算力产业深度报告") is False
+
+
+def test_cover_max_font_text_picks_largest_span(tmp_path):
+    p = tmp_path / "r.pdf"
+    build_report_pdf(p, npages=5)
+    d = fitz.open(p)
+    assert ep.cover_max_font_text(d[0]) == "中国AI算力产业深度报告"
+    d.close()
+
+
+def test_find_cover_date_chinese_full():
+    assert ep.find_cover_date("发布日期 2026年7月15日 中金公司") == "2026-07-15"
+
+
+def test_find_cover_date_chinese_year_month_only():
+    """只有年月 → 补 01 日。"""
+    assert ep.find_cover_date("2026年7月 行业深度") == "2026-07-01"
+
+
+def test_find_cover_date_iso():
+    assert ep.find_cover_date("published 2026-07-15") == "2026-07-15"
+
+
+def test_find_cover_date_english_month_year():
+    assert ep.find_cover_date("July 2026 Industry Outlook") == "2026-07-01"
+
+
+def test_find_cover_date_returns_none_when_absent():
+    assert ep.find_cover_date("no date at all here") is None
+
+
+def test_find_org_name_matches_research_institution():
+    assert ep.find_org_name("中金公司研究部\n某某分析师") == "中金公司研究部"
+    assert ep.find_org_name("Morgan Stanley Research\nequity") == "Morgan Stanley Research"
+
+
+def test_slugify_org_ascii_and_cjk():
+    assert ep.slugify_org("Morgan Stanley Research") == "morgan-stanley-research"
+    # CJK 无法音译,退回 pdf 兜底 slug,不产出乱码
+    assert ep.slugify_org("中金公司研究部") == "pdf"
+
+
+def test_build_metadata_cover_date_beats_creation_date(tmp_path):
+    """核心断言:封面印的日期必须赢过 PDF CreationDate。
+
+    一份 2026-07-15 发布的研报被重新导出,CreationDate 会变成 2026-08-01。
+    用 CreationDate 会让时间线错位,正是 ingest.md:321 要防的事。
+    """
+    p = tmp_path / "r.pdf"
+    build_report_pdf(p, npages=5, creation_date="D:20260801093000+08'00'")
+    d = fitz.open(p)
+    meta, conf = ep.build_metadata(d, p)
+    d.close()
+    assert meta["date"] == "2026-07-15"
+    assert meta["source"] == "pdf:cover-text"
+
+
+def test_build_metadata_falls_back_to_creation_date(tmp_path):
+    """封面无日期时才用 CreationDate,且 source 要说清楚。"""
+    p = tmp_path / "r.pdf"
+    build_report_pdf(p, npages=5, cover=False,
+                     creation_date="D:20260801093000+08'00'")
+    d = fitz.open(p)
+    meta, conf = ep.build_metadata(d, p)
+    d.close()
+    assert meta["date"] == "2026-08-01"
+    assert meta["source"] == "pdf:info-creationdate"
+    assert conf["date"] == "low"
+
+
+def test_build_metadata_rejects_junk_info_title(tmp_path):
+    p = tmp_path / "r.pdf"
+    build_report_pdf(p, npages=5, title="Microsoft Word - draft.doc")
+    d = fitz.open(p)
+    meta, conf = ep.build_metadata(d, p)
+    d.close()
+    assert meta["title"] == "中国AI算力产业深度报告"
+
+
+def test_build_metadata_always_has_exactly_seven_keys(tmp_path):
+    """键集恒定是下游零改动的前提。"""
+    p = tmp_path / "r.pdf"
+    build_report_pdf(p, npages=5)
+    d = fitz.open(p)
+    meta, _ = ep.build_metadata(d, p)
+    d.close()
+    assert set(meta) == {"date", "title", "author", "publication",
+                         "source_slug", "canonical", "source"}
+
+
+def test_build_metadata_canonical_is_absolute_path(tmp_path):
+    p = tmp_path / "r.pdf"
+    build_report_pdf(p, npages=5)
+    d = fitz.open(p)
+    meta, _ = ep.build_metadata(d, p)
+    d.close()
+    assert meta["canonical"] == str(p.resolve())
