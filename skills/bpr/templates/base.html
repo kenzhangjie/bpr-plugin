@@ -13,16 +13,21 @@
   3. All mobile-only elements have base `display:none`, flipped on in
      @media(max-width:1099px).
 
-  Replaceable placeholders:
-    {{LANG}}        zh-CN
-    {{TITLE}}       page title
-    {{HERO}}        full <header class="hero"> contents (kicker / h1 / .hero-zh / .hero-lede / .hero-meta)
-    {{TLDR_LABEL}}  fixed string: TL;DR · 速读
-    {{TLDR_H2}}     descriptive theme (NOT "X 条来自...")
-    {{TLDR_ITEMS}}  one or more <li> per "每条 TL;DR 格式" in rules.md
-    {{TOC_ITEMS}}   one <li><a href="#chN">NN · descriptive title</a></li> per chapter
-    {{CHAPTERS}}    full chapter <section>s — see CHAPTER TEMPLATE block at bottom
-    {{FOOTER}}      footer block
+  Replaceable placeholders — each appears in the body wrapped in double
+  braces. The braces are omitted in this list on purpose: a renderer that
+  fills placeholders with a plain string replace would otherwise fill them
+  HERE too, duplicating the whole document inside this comment.
+    LANG        zh-CN
+    TITLE       page title
+    HERO        full <header class="hero"> contents (kicker / h1 / .hero-zh / .hero-lede / .hero-meta)
+    TLDR_LABEL  fixed string: TL;DR · 速读
+    TLDR_H2     descriptive theme (NOT "X 条来自...")
+    TLDR_ITEMS  one or more <li> per "每条 TL;DR 格式" in rules.md
+    TOC_ITEMS   one <li><a href="#chN">NN · descriptive title</a></li> per chapter
+    CHAPTERS    full chapter <section>s — see CHAPTER TEMPLATE block at bottom
+    FOOTER      footer block
+    TOC_ITEMS appears TWICE in the body (mobile overlay + desktop rail);
+    every other placeholder appears exactly once.
 -->
 <!DOCTYPE html>
 <html lang="{{LANG}}" data-theme="light">
@@ -522,10 +527,10 @@
           <p class="en">"Original english sentence."</p>
           <p class="zh">"中文翻译。"</p>
         </div>
-        <!-- more .bilingual blocks -->
+        … more .bilingual blocks …
       </div>
     </div>
-    <!-- more .turn blocks -->
+    … more .turn blocks …
   </section>
 
   ESSAY MODE (no .turn / .speaker / .timestamp):
@@ -540,12 +545,12 @@
         <p class="en">"Original english sentence."</p>
         <p class="zh">"中文翻译。"</p>
       </div>
-      <!-- more .bilingual blocks -->
+      … more .bilingual blocks …
     </div>
   </section>
 
   CHUNKED-WRITE MODE (HTML > 30KB):
-  Replace turn/body content with `<!-- BODY:chN -->` placeholder during
+  Replace turn/body content with a `BODY:chN` HTML-comment placeholder during
   initial Write. Fill via Edit per chapter. See lessons-learned.md.
 
   ════════════════════════════════════════════════════════════════════
@@ -577,7 +582,7 @@
          <p class="contrarian-quote">"嘉宾原话引用,中文 verbatim"</p>
          <p class="contrarian-why"><strong>为什么非共识 · </strong>多数人觉得 X,他说 Y,因为 Z。</p>
        </div>
-       <!-- 3-8 个 .contrarian-item -->
+       … 3-8 个 .contrarian-item …
      </section>
 
   4. Chapter body uses .ch-summary (浓缩摘要,不双语对照):
