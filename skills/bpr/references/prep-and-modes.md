@@ -21,7 +21,14 @@ YouTube 只拿到 auto-subs(无标点、无 speaker)时,PREP 先做退化处理�
 ### 触发条件
 **CJK < 60%**(判定见下「语言检测算法」)且输入是 **transcript 类**(有 `>>` 或 speaker 信号)。**essay(单作者、无说话人轮换的博客/长文)跳过本节**,直接走原有 PREP 流程。
 
-对应脚本:`scripts/prep/clean_en.py`(`parse_blocks` / `split_windows` / `load_mappings` / `apply_correct_table` / `norm_words` / `word_coverage` / `append_glossary` / `finalize` + CLI)。**中文专名纠错走 `clean.md` 的 CLEAN 三步法,英文不跑那套(不书面化,逐字交 TRANSLATE)**——两条源清洗路径平行、互不调用。
+对应脚本:
+- `scripts/prep/clean_en.py` —— 切窗 / 拼装 / 闸门(`parse_blocks` / `split_windows` /
+  `word_coverage` / `added_ratio` / `finalize` + CLI)
+- `scripts/lib/glossary_lib.py` —— **glossary 的单一实现**(解析 / 构映射 / 套用 / 体检 /
+  回写)。`~/.config/volc/volc_asr.py` import 的是同一份;两边曾各写一遍,而且两份都漏了
+  词边界,详见 Step 4 的踩坑框。
+
+**中文专名纠错走 `clean.md` 的 CLEAN 三步法,英文不跑那套(不书面化,逐字交 TRANSLATE)**——两条源清洗路径平行、互不调用。
 
 ### Step 1 · Analyze-lite(主代理,全稿 1 次)
 读两份 ground truth,产出一份小 brief(塞进后续每个子代理 prompt,保跨窗一致):
@@ -77,34 +84,89 @@ YouTube 只拿到 auto-subs(无标点、无 speaker)时,PREP 先做退化处理�
 把各窗子代理返回的 JSON 按窗序拼成一份完整 turns 列表,写成文件,跑 `clean_en.py` 的 CLI:
 
 ```bash
+# 先把 split_windows 切出来的原始窗存成 JSON(list[str] 或 list[list[str]])——
+# 不传 --windows 只能拿到一个全局数字,说不出「哪一窗」。
 python3 scripts/prep/clean_en.py \
   --turns <拼好的 turns.json> \
   --raw <原始逐字稿 txt> \
+  --windows <原始窗 windows.json> \
   --out <输出路径 turns.clean.json> \
   --names <本期专名清单 JSON,回写 glossary —— 见 Step 4,不是可选>
 ```
 
-跑完看 stdout **第一行**:正常是 `专名硬映射 N 条(来自 glossary 第 3 列)`。
+跑完看 stdout **第一行**:正常是 `专名硬映射 N 条(来自 glossary 第 3 列)· 保护名单 M 项`。
 如果看到 `WARN: 专名硬映射为空` 或 `WARN: glossary 读不到`,说明**这一层空转了**,
 先修 glossary 再继续 —— 别把 `coverage ok=True` 当成"全都跑过了"(覆盖率闸和硬映射是两回事)。
 
-CLI 内部调用 `finalize(turns, raw, mappings)`:对每句套 `apply_correct_table`,再用 `word_coverage` 算整体覆盖率。**覆盖率 < 0.98 视为丢句**——CLI 以非零退出码 + `WARN` 提示打回,**主代理需把该窗打回 Step 2 重派一次**;重做仍不过,该处标 `⟨?丢失⟩` 留人工,不无限重试。这是把"英文 verbatim"从软约束升级成硬闸。当 LLM 纠正了一个尚未进 `correct_table` 的专名时,词覆盖可能略降(该专名变体只在源侧);这属正常,别无限重派——沿用既有的"标 `⟨?丢失⟩` 留人工"逃生口。
+CLI 内部调用 `finalize(turns, raw, corrections, windows=...)`,产出三个数:
+
+| 输出 | 问的是什么 | 不过怎么办 |
+|---|---|---|
+| `coverage` | 源词多重集被输出覆盖的比例 | < 0.98 视为丢句 |
+| **逐窗覆盖 + 最差窗号** | **每一窗**的词有没有出现在输出里 | **把 WARN 点名的那几窗打回 Step 2 重派** |
+| `added_ratio` | 输出里多出来的词占源词的比例 | > 0.05 只提醒,不拦(见下) |
+
+**为什么必须传 `--windows`**(2026-08-07 修):`coverage` 只有一个全局数字,而本节要求
+"把该窗打回 Step 2 重派" —— 拿不到窗号,这条硬规则**根本执行不了**。传了之后 CLI 直接打
+`WARN: 这些窗覆盖 < 0.98,回 Step 2 重派:#7(0.612), #12(0.883)`,照着重派即可。
+重做仍不过,该处标 `⟨?丢失⟩` 留人工,不无限重试。
+
+**`added_ratio` 补的是另半边**:`coverage` 只问"源词有没有被盖住",子代理凭空加一整段
+**完全不掉分**。加译率偏高 = 疑似加译 / 复述 / 幻觉。专名纠错本身会贡献少量新词(变体
+只在源侧),所以它是**报告项不是硬闸** —— 偏高时抽查那几段,别机械重派。
+
+当 LLM 纠正了一个尚未进 glossary 第 3 列的专名时,词覆盖可能略降(该变体只在源侧);
+这属正常,沿用"标 `⟨?丢失⟩` 留人工"的逃生口。
 
 ### Step 4 · 确定性后处理 + 专名飞轮
-`finalize` 在拼装时自动套用双语硬映射(`apply_correct_table` 补子代理的遗漏;长键优先,避免短键抢先命中长专名)。
-映射来自 **`glossary.txt` 第 3 列(错法)**,由 `parse_glossary` + `glossary_mappings` 构成 —— 这是专名的**单一真源**。
-**英文由这一步套用,不跑 `volc_asr.py`**(那是中文专用)。
+`finalize` 在拼装时自动套用双语硬映射,补子代理的遗漏。映射来自 **`glossary.txt` 第 3 列
+(错法)** —— 这是专名的**单一真源**。**英文由这一步套用,不跑 `volc_asr.py`**(那是中文专用)。
+
+替换逻辑本身在 **`scripts/lib/glossary_lib.py`**,`volc_asr.py` import 的是同一份。
+不许再各写一份 —— 它们曾经各写一份,而且**两份都没有词边界**(下面那条踩坑)。
+
+> ⚠️ **踩坑(2026-08-07):`小红书` 被改成 `肖弘书`。**
+> `肖弘|20|小红,小宏,小虹` 配上无边界的子串替换,把「小红书 / 小红帽 / 小红点」全改坏了。
+> 更糟的是它发生在 **ASR 输出那一刻**(CLEAN 之前),而 CLEAN 的 prompt 写着"专名与
+> glossary 不一致时信 glossary",VERIFY 的覆盖闸只查"有没有丢"不查"有没有被改错"
+> —— 三道网全穿。现在三层防护:
+> 1. **保护名单优先** —— glossary 第 1 列全部正确名 + `~/.config/volc/protect.txt`
+>    里的常用词;同一起点上保护项永远赢。
+> 2. **拉丁键强制词边界** —— `Codeex→Codex` 不会咬到 `Codeexes`。
+> 3. **长度闸** —— CJK 键 < 3 字、拉丁键 < 4 字直接拒收 + WARN(2 字 CJK 键本质
+>    不安全,未知碰撞防不住)。
+>
+> 加词之后跑一次体检:
+> ```bash
+> python3 scripts/prep/clean_en.py --check-glossary
+> ```
+> 列出被拒收的短键、冲突(同一错法映射到多个正确名)、与保护名单的碰撞。有冲突/碰撞时退出码 1。
 
 > ⚠️ **旧文档说的 `correct_table.json` 已于 2026-07-25 并入 glossary 第 3 列**。
 > `--correct-table` 只作遗留兼容,默认不启用;硬编那个路径会读到一个不存在的文件而**静默空转**
 > (2026-08-01 实测:映射 0 条,脚本照样打印 `ok=True`)。现在缺文件会 WARN 到 stderr。
 
-**回写飞轮(必做,不是可选)**:收尾传 `--names <本期专名 JSON list>`,CLI 会调 `append_glossary`
-把本期新专名去重后 append 进 `~/.config/volc/glossary.txt`(`专名|默认权重`,与中文飞轮同一份文件)。
-不传 = 这一轮学到的专名全丢,下期从零再猜。跑得越多专名越准——复利同 `clean.md`。
+**回写飞轮(必做,不是可选)**:收尾传 `--names`,CLI 会把本期新专名 append 进
+`~/.config/volc/glossary.txt`(与中文飞轮同一份文件)。不传 = 这一轮学到的专名全丢,
+下期从零再猜。
+
+**`--names` 要用带错法的新形态**(2026-08-07 起):
+
+```json
+[{"term": "Codex",      "seen_as": ["Codeex"]},
+ {"term": "Ambrosino",  "seen_as": ["Ambercino", "Ambersino"]},
+ {"term": "Legora",     "seen_as": []}]
+```
+
+只传 `["Codex", "Legora"]` 这种老形态仍然能跑,但**只写第 1 列**。而 `apply_correct_table`
+**只吃第 3 列** —— 于是飞轮只让参考表变长,纠错层原地不动(2026-08-07 实测:284 条专名
+只对应 38 条硬映射)。`seen_as` 填**本期源里真见过的错法**,这一层才会随着跑的期数变厚。
+
+CLI 会打印 `glossary += N 条专名 · 错法 += M 条 · 拒收 K 条`,拒收原因走 stderr
+(短键 / 已映射到别的正确名 / 与保护名单碰撞)。
 
 > 只回写**确认过拼写**的专名(查过官网/报道的),别把 `⟨?⟩` 里的猜测写进真源——污染 glossary 比漏记更贵。
-> 新专名的**错法**(第 3 列)在本期真见过才填,没见过就只填第 1 列。
+> 错法同理:本期真见过才填,没见过就只给 `"seen_as": []`。
 
 ### 降级(不幻觉)
 - **description 缺失/无用** → 专名靠 glossary + 上下文猜;说话人靠启发式(**提问者 = host**)。

@@ -376,7 +376,7 @@ BASE_TOKENS = """
       --rule:#c9bfae; --accent:#b04a2f; --accent-soft:#d68a72;
       --sun-1:#f3a93b; --sun-2:#e57341;
       --serif-en:'Playfair Display',Georgia,serif;
-      --serif-zh:'Noto Serif SC',-apple-system,'PingFang SC',serif;
+      --serif-zh:'Songti SC','STSong','SimSun','Noto Serif CJK SC','Source Han Serif SC',serif;
       --sans:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     }
     [data-theme="dark"] {
@@ -513,7 +513,7 @@ THEME_TOGGLE_JS = """
 FONT_LINK = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
     '  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-    '  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">'
+    '  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">'
 )
 
 

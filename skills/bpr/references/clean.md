@@ -17,6 +17,12 @@
   - shownote **仅小宇宙有**;B站/YouTube 无 `shownote` 字段时跳过它,靠 title + podcast + glossary + 全稿上下文即可(降级,不报错)。
   - ⚠️ **必带 `podcast` 字段**:主持人本名常只在节目名里(如"张小珺Jùn｜商业访谈录"的"珺"),shownote 正文没有——不喂 podcast 名,`小俊/小军` 就纠不对(实测踩过)。
 - `~/.config/volc/glossary.txt`:常驻专名词库,**唯一真源**。格式 `正确名|权重|错法1,错法2`(第 3 列可选,只放无歧义错法,供 volc_asr 硬纠)。CLEAN 读第 1 列当参考,忽略权重与错法列。
+  > ⚠️ **第 3 列的错法有硬约束**(2026-08-07):CJK 键 ≥3 字、拉丁键 ≥4 字,且不能是常用词的子串。
+  > 起因:`肖弘|20|小红,…` 把「小红书 / 小红帽 / 小红点」改成了「肖弘书 / 肖弘帽 / 肖弘点」,
+  > 而且改在 **ASR 输出那一刻** —— 本节的 prompt 又写着"专名与 shownote 不一致时信 shownote",
+  > 子代理不会去纠一个看起来像专名的词,Step C.5 的保真闸也只查"丢没丢"不查"改没改错"。
+  > 加词后跑一次体检:`python3 scripts/prep/clean_en.py --check-glossary`;
+  > 常用词兜底名单在 `~/.config/volc/protect.txt`。三层防护细节见 `prep-and-modes.md` Step 4。
 
 产出 brief:
 1. **领域术语表**:综合 shownote + glossary,列本期专名(标保留英文/固定中文)。AI/科技/投资/growth 优先。

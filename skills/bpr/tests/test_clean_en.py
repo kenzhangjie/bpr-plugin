@@ -150,6 +150,48 @@ def test_scan_glossary_is_case_insensitive():
     assert ce.scan_glossary("openai rocks", e)[0]["term"] == "OpenAI"
 
 
+def test_finalize_per_window_localizes_the_dropped_window():
+    """回归 2026-08-07:全局 coverage 说不出「哪一窗」,硬规则就执行不了。"""
+    windows = ["alpha bravo charlie delta echo",
+               "foxtrot golf hotel india juliett",     # ← 这一窗整个被丢
+               "kilo lima mike november oscar"]
+    raw = " >> ".join(windows)
+    turns = [{"speaker": "A", "sents": [windows[0]]},
+             {"speaker": "B", "sents": [windows[2]]}]
+    r = ce.finalize(turns, raw, {}, windows=windows)
+    assert r["ok"] is False
+    assert r["worst_window"]["index"] == 1
+    assert [w["ok"] for w in r["windows"]] == [True, False, True]
+
+
+def test_finalize_per_window_all_ok_when_nothing_dropped():
+    windows = ["alpha bravo charlie", "delta echo foxtrot"]
+    turns = [{"speaker": "A", "sents": windows}]
+    r = ce.finalize(turns, " >> ".join(windows), {}, windows=windows)
+    assert r["ok"] is True and all(w["ok"] for w in r["windows"])
+    assert r["worst_window"]["index"] in (0, 1)
+
+
+def test_finalize_without_windows_keeps_old_shape():
+    turns = [{"speaker": "A", "sents": ["one two three"]}]
+    r = ce.finalize(turns, "one two three", {})
+    assert r["windows"] == [] and r["worst_window"] is None and r["ok"] is True
+
+
+def test_added_ratio_catches_insertion():
+    # 覆盖率满分但凭空多出一整句 → added_ratio 抓得到
+    assert ce.word_coverage("a b c d", "a b c d e f g h") == 1.0
+    assert ce.added_ratio("a b c d", "a b c d e f g h") == 1.0
+    assert ce.added_ratio("a b c d", "a b c d") == 0.0
+
+
+def test_finalize_reports_added_ratio():
+    turns = [{"speaker": "A", "sents": ["one two three plus a fabricated tail here"]}]
+    r = ce.finalize(turns, "one two three", {})
+    assert r["added_ratio"] > ce.ADDED_WARN
+    assert r["ok"] is True          # 报告项,不拦
+
+
 def test_finalize_proper_noun_correction_does_not_lower_coverage():
     # Regression: proper noun corrections should not artificially lower coverage.
     # The sub-agent has already corrected the turns output ("OpenAI", "Ambrosino", "Codex"),

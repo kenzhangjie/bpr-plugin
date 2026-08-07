@@ -34,7 +34,8 @@ ln -s "$(pwd)/skills/bpr" ~/.claude/skills/bpr
 
 ❌ **不接受**:
 - 改 `references/lessons-learned.md` 的历史条目(只能新增,不能删/改)
-- 加水印 / 品牌区到 `poster-template.html` 默认版(无水印是硬规则)
+- 往 `glossary.txt` 第 3 列加短错法(CJK <3 字 / 拉丁 <4 字)—— 无边界子串替换会误伤常用词
+  (`小红→肖弘` 曾把「小红书」改成「肖弘书」);跑 `clean_en.py --check-glossary` 自查
 - 引入网络请求外的外部依赖(本插件应保持自包含)
 
 ## PR checklist
@@ -61,9 +62,9 @@ ln -s "$(pwd)/skills/bpr" ~/.claude/skills/bpr
 例:
 
 ```markdown
-## L4. 海报 hero 抬头被截
+## L9. hero 抬头被截
 
-**症状**:某次海报输出 hero 段右侧"嘉宾抬头"显示 `Anton...`,被裁了。
+**症状**:某次输出 hero 段右侧"嘉宾抬头"显示 `Anton...`,被裁了。
 
 **根因**:`.kicker .meta` 的 max-width 设了 600px,Mac 的 PingFang SC 在某些 weight 下字宽超了。
 

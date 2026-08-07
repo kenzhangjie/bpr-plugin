@@ -176,7 +176,7 @@ python3 scripts/publish/render_zh.py \
 | 用途 | 字体 | 为什么 |
 |---|---|---|
 | 英文显示 | Playfair Display(serif,可变粗细)| 编辑感强,有 italic 优雅,适合 hero 大字 |
-| 中文显示 | Noto Serif SC | 与 Playfair 字重接近,中英混排不打架 |
+| 中文显示 | 系统宋体栈(Songti SC / STSong / SimSun) | 零下载。Noto Serif SC 于 2026-07-29 移除:CJK 走 Google Fonts 单页要拉 38 个子集分片共 2.5MB,且国内无代理直接白屏 |
 | UI / 元数据 | Inter | sans 中性,适合 toc / timestamp / kicker |
 | 代码 | ui-monospace 系统栈 | 无需引入,系统字体自动选 SF Mono / Menlo |
 

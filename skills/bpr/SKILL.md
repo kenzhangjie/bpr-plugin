@@ -6,8 +6,8 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 # BPR · Bilingual Podcast / Essay Reader
 
 ## 触发条件
-- 用户输入 `/bpr <内容>` 或 `/bpr` 后跟 transcript / 博客 URL / 长文文本 → 只出 HTML
-- 用户输入 `/bpr all <内容>` → 出 HTML **+** 海报 hidpi PNG
+- 用户输入 `/bpr <内容>` 或 `/bpr` 后跟 transcript / 博客 URL / 长文文本 → 出 HTML
+- `/bpr all <内容>` 仍然接受,但**等同于 `/bpr`**(海报已于 1.7.3 移除,见下)
 - 用户上传字幕文件并要求"做成双语阅读器"
 - 用户明确说"按 BPR 规则"
 
@@ -26,7 +26,10 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 | **7 · VERIFY** | 质量自检:英文双语走句数覆盖闸(不足回 TRANSLATE 补);中文 CLEAN 走实体覆盖闸(不足回 CLEAN 补)。详见 verify.md。 | `references/verify.md` |
 | **8 · PUBLISH** | 重建 landing index → 部署 bpr.ken.solar(proxy 直连)。 | `references/publish.md`(产物约定 + 部署)· `scripts/publish/build_index.py` |
 
-**海报(可选分支)**:命令以 `/bpr all` 开头时,在 RENDER 后追加一步出 hidpi PNG。详见 `references/poster.md` · `scripts/poster/crop_and_share.py`。
+> **海报分支已于 1.7.3 移除**:上线两个多月、120 篇产出里 **0 张海报**,而它占着
+> 207 行 reference + 879 行模板 + 一个脚本,每次读 SKILL.md 都得绕过它。
+> `/bpr all` 保留为别名(不报错,行为 == `/bpr`)。真要海报,去 git 历史里 1.7.2
+> 及更早的 tag 捞那三个文件(reference / 模板 / crop 脚本)。
 
 > **抓取硬提醒**:YouTube / 小宇宙 / Bilibili 走 INGEST 的 `scripts/fetch/*`,**不要**假装能直接 WebFetch 到 transcript;小宇宙/Bilibili 无字幕内容必经飞书妙记转录(见 `references/ingest.md`)。
 > **模式判定**:CJK ≥ 60% → 中文模式,**完全自动**,不接受修饰词覆盖(见 `references/prep-and-modes.md`)。
@@ -60,12 +63,12 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 
 ## 修饰词
 `只英文`(跳过中文)· `深色`(暗色,已默认可切)· `简洁`(减装饰)· `正式`(去口语化)· `速读`(默认只显中文)· `学习`(双语并排两列)· `带批注`(callout 加 `[Ken note]`)。
-> 海报**不再用修饰词触发**,改为子命令前缀 `/bpr all`(见 `references/poster.md`)。
+> 海报相关修饰词与 `/bpr all` 子命令**均已失效**(1.7.3 移除海报分支)。
 
 ## 错误处理
 - < 500 字:提示并询问要不要继续。
 - 非英文源(非中/英):询问目标语言。
-- > 50K 字:询问是否分文件。
+- > 100K 字:询问是否分文件。(2026-08-07 由 50K 上调:8.5 万字 / 3.5 小时的中文访谈实测单文件可承载,渲染 17 章 + 740 turn 书面正文 + 740 turn 折叠底档正常)
 - YouTube auto-subs(无标点/无 speaker):PREP 先重断句+加标点;无法可靠分 speaker → 退化成 essay 模式渲染。
 - URL 输入细节 → `references/ingest.md`。
 - 本地 PDF 无文字层 / 文字层被权限锁:`extract_pdf.py` 退出码 3,需 OCR(阶段 3)。**不要**跳过这些页继续,会静默丢内容。

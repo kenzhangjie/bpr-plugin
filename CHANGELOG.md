@@ -5,6 +5,113 @@ All notable changes to this plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.7.3 — 2026-08-07
+
+**修一个正在静默改错内容的专名替换 + 三处闸门从"喊口号"变成"能执行" + 删掉零使用的海报分支。**
+
+### Fixed
+
+- **`小红书` 被改成 `肖弘书`**(最要紧的一条)。`glossary.txt` 第 3 列的
+  `肖弘|20|小红,小宏,小虹` 配上**无词边界的子串替换**,会把「小红书 / 小红帽 / 小红点」
+  全改坏。危险在于它发生在 **ASR 输出那一刻**(CLEAN 之前):CLEAN 的 prompt 写着
+  "专名与 shownote/glossary 不一致时信 glossary",子代理不会去纠;Step C.5 保真闸
+  只查"丢没丢"不查"改没改错";VERIFY 同理 —— **三道网全穿**。
+  - 新增 **`skills/bpr/scripts/lib/glossary_lib.py`** 作为 glossary 的**单一实现**。
+    此前同一份替换逻辑在两处各写了一遍(`volc_asr.py` 的 `str.replace` 和
+    `clean_en.py` 的 `apply_correct_table`),**两份都漏了词边界** —— 修一处漏一处。
+    `~/.config/volc/volc_asr.py` 现在 import 这一份;找不到插件时**跳过该层并 WARN**,
+    不回退到旧实现。
+  - 三层防护:① **保护名单优先**(glossary 第 1 列全部正确名 + `~/.config/volc/protect.txt`,
+    单次扫描的正则里保护分支排在错法分支前面)· ② **拉丁键强制词边界**
+    (`Codeex→Codex` 不咬 `Codeexes`)· ③ **长度闸**(CJK 键 <3 字、拉丁 <4 字直接拒收 + WARN)。
+  - 新增 `clean_en.py --check-glossary` 体检:列出被拒收的短键、冲突(同一错法映射到
+    多个正确名)、与保护名单的碰撞;有冲突/碰撞退出码 1。
+  - 数据侧:`glossary.txt` 里 5 个 2 字错法(`小红/小宏/小虹/潘乐/涛哥`)移入停用注释块,
+    正确名留在第 1 列;新增 `protect.txt`(小红帽/小红点/小红花)。
+- **`base.html` 还在拉 Noto Serif SC**。CJK 走 Google Fonts 单页要拉 38 个子集分片
+  共 2.5MB,国内无代理直接白屏。2026-07-29 已把 113 篇产出事后 sed 成系统宋体栈,
+  但**模板没改**,于是 2026-08-06 新渲染的那篇又退回去了 —— 修好的东西被模板反复弄坏。
+  现在 `base.html` / `build_index.py` / `render.md` 三处一起改掉,与线上 Vercel 端
+  `bin/build_index.py` 对齐。
+- **`verify.md` 的体积自检区间失效**。写的是「正常 70-110KB」,而全库 120 篇**中位
+  138KB**、最大 1,083KB —— 对大多数产出恒为「异常」。改成按版型分档(essay 25-120KB /
+  英文双语 90-300KB / 中文模式 250-1,100KB),并说明**偏低才危险**。
+- **CHANGELOG 补齐 v1.7.0 / v1.7.1 / v1.7.2**(此前三个版本零记录,见下)。
+
+### Changed
+
+- **覆盖率闸能定位到窗了**(P3)。`clean_en.py finalize` 原来只吐一个全局 `coverage`,
+  而 `prep-and-modes.md` 要求"把该窗打回 Step 2 重派" —— 拿不到窗号,这条硬规则
+  **根本执行不了**。新增 `--windows`,输出逐窗覆盖率 + 最差窗号,直接打
+  `WARN: 这些窗覆盖 < 0.98,回 Step 2 重派:#7(0.612), #12(0.883)`。
+- **新增 `added_ratio` 抓加译/幻觉**。`word_coverage` 只问"源词有没有被盖住",子代理
+  凭空加一整段**完全不掉分**。加译率是它的反向指标(报告项,不拦 —— 专名纠错本身会
+  贡献少量新词)。
+- **中文实体覆盖闸脚本化**:新增 `skills/bpr/scripts/verify/entity_coverage.py`,
+  直接对账成品的「折叠底档」与「书面正文」。此前 verify.md 只写了一行"人工抽查" ——
+  抽查 ≠ 检索,漏掉的恰恰是没抽到的那条。
+  - 按**数值**而不是字面比对:`1700万` ↔ `一千七百万`、`190` ↔ `一百九`、`10万` ↔ `十万`
+    都算兑上(第一版按字面比,在两篇已发布成品上报了 3 个「丢失」,人工复核**全是假警报**)。
+  - 非对称设计:**来源只取阿拉伯数字**(中文里 一/二/三 同时是普通词,当来源会造出
+    16-26 个假警报),**兑账两边都认**。年份与拉丁专名降级为软报告(ASR 常把年份读碎,
+    CLEAN 规范化是对的;拉丁专名"消失"多半是 CLEAN 纠对了拼写)。
+  - 剔掉时间戳与 `<summary>` 版面数字(`1:26:23` 会被读成 1/26/23;
+    「展开逐字原稿（125 段）」的段数是渲染产物)。
+  - 实测:两篇长中文成品的待核项从 26 / 16 条降到 **1 / 1 条**,剩下的都是 ASR 把数字
+    读碎(`拿了大概7000` 下一句才是 `8千万美金`)。**非空 ≠ 一定有 bug**,措辞已如实。
+- **专名飞轮补上第 3 列**(P4)。`append_glossary` 只写 `名|权重`,而硬映射**只吃第 3 列**
+  → 飞轮只让参考表变长,纠错层原地不动(实测 284 条专名只对应 38 条硬映射)。
+  `--names` 现接受 `[{"term": "Codex", "seen_as": ["Codeex"]}]`,把本期真见过的错法
+  merge 进第 3 列(过长度闸 + 保护名单 + 冲突检查,拒收项走 stderr)。老形态仍兼容。
+- 测试从 104 例增至 **152 例**(新增 `test_glossary_lib.py` 19 例、`test_entity_coverage.py` 24 例、
+  `test_clean_en.py` 补 5 例)。
+
+### Removed
+
+- **海报分支**(`references/poster.md` 207 行 + `templates/poster-template.html` 879 行 +
+  `scripts/poster/crop_and_share.py`)。上线两个多月、**120 篇产出里 0 张海报**,
+  却占着 1,141 行并让每次读 SKILL.md 都要绕过它。`/bpr all` 保留为别名(不报错,
+  行为 == `/bpr`);要恢复去 git 历史里捞。
+  > `build_index.py` 里还有约 150 行海报画廊代码(`posters.html` / lightbox / 缩略图)。
+  > 它在本次改动**之前就已经是死代码**(0 张海报 → 分支永不进入),按"不删非我造成的
+  > 死代码"的规矩留着,单独记一笔待处理。
+- README 目录树同步到实际结构(自 1.5.0 重构后一直还写着 `rules.md` / `checklist.md`
+  这些已改名的文件)。
+
+## v1.7.2 — 2026-08-07
+
+**单文件字数上限 50K → 100K。**
+
+- 8.5 万字 / 3.5 小时的中文访谈实测单文件可承载(渲染 17 章 + 740 turn 书面正文 +
+  740 turn 折叠底档正常),原来的 50K 闸会无谓地把它劝去分文件。
+- ⚠️ **这个版本曾只存在于本地 plugin cache**,git 上没有 —— 下一次 `/plugin update`
+  会静默把它冲回 1.7.1。1.7.3 把它补进仓库。发版必须走 `tools/release.sh`,
+  别直接改 cache 目录。
+
+## v1.7.1 — 2026-08-05
+
+**修 `base.html` 注释污染:每一个渲染产物的内容都翻倍了。**(PR #6)
+
+- 骨架模板里的占位符注释与嵌套注释,会让渲染器把示例内容当正文一起输出。
+  实测同一篇:文件 119KB → **225KB**、`.chapter` 11 → **25**、`.bilingual` 256 → **514**,
+  essay 模式正文还会整块不可见。
+- 坑在于**浏览器里看不出来**:内容被填进注释,DOM 自检全绿,只有 `wc -c` 体积闸能发现。
+  这也是 1.7.3 把 verify.md 体积区间修准的动机之一。
+
+## v1.7.0 — 2026-08-04
+
+**本地 PDF 输入(阶段 1)。**(PR #5)
+
+- `/bpr <path.pdf>` 能把**文字层 PDF**(研报 / 白皮书 / 书籍章节)解析成干净正文 + 元数据。
+  新增 `scripts/fetch/extract_pdf.py`(剥跨页页眉页脚、接行尾断词、双栏按栏序拉直)
+  与 `scripts/fetch/pdf_layout.py`;产物 `body.txt` / `pages.jsonl` / `metadata.json` / `tables.json`。
+- **下游零改动**:靠 `metadata.json` 与既有 `extract_metadata.py` 的 7 键同形,
+  `STRUCTURE / TRANSLATE / RENDER / VERIFY / PUBLISH` 一行没动。
+- 退出码约定:`0` 成功 · `2` 输入非法(非 PDF / 已加密)· `3` 需要 OCR(含"只有个别页
+  无文字层"——研报最常见形态,跳过那几页就是静默丢内容)。
+- 发布日期**必须来自封面正文,不是 PDF CreationDate**(旧研报重新导出会变成今天)。
+- 设计文档:`docs/superpowers/specs/2026-08-03-bpr-pdf-input-design.md`。
+
 ## v1.6.3 — 2026-08-02
 
 **reader 自带划线收藏 + 修掉 publish 里会删 landing 的守卫。**

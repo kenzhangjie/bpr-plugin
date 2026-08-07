@@ -1,6 +1,6 @@
 # BPR · Bilingual Podcast Reader
 
-把英文 podcast、transcript、字幕、博客 essay、长文 article 一键转成**编辑设计风格的双语阅读 HTML**(可选生成可分享的长图海报)。
+把英文 podcast、transcript、字幕、博客 essay、长文 article 一键转成**编辑设计风格的双语阅读 HTML**。中文素材自动切到「TL;DR + 非共识 + 书面正文 + 折叠逐字底档」模式。
 
 为想"沉浸式读完一期英文播客 / 一篇 PG essay,但又想要中文对照"的人做的。
 
@@ -19,7 +19,9 @@
 /bpr <YouTube URL>
 /bpr <博客 URL>
 /bpr <粘贴的英文 transcript>
-/bpr <上传的 SRT/VTT 字幕> 海报      ← 加 "海报" 修饰词额外出张分享长图
+/bpr <上传的 SRT/VTT 字幕>
+/bpr <本地 PDF 路径>                 ← 研报 / 白皮书 / 书籍章节
+/bpr <小宇宙 / Bilibili URL>         ← 中文播客,走 ASR 转录
 ```
 
 ## What it does
@@ -35,7 +37,6 @@
 - 单文件 HTML(无外链依赖,可直接发邮件/上传/归档)
 - 包含 Hero / TL;DR / 章节正文(英中双语对照) / 目录 / 深色模式
 - 文件名严格规范化(`{date}_{source}_{author}_{topic}.html`)
-- 可选海报模式:再额外生成 1080 宽分享长图 PNG
 
 ## Why
 
@@ -60,21 +61,26 @@ bpr-plugin/
 │   ├── ISSUE_TEMPLATE/{bug,feature}.yml
 │   └── pull_request_template.md
 ├── skills/bpr/
-│   ├── SKILL.md                       ← 主流程
-│   ├── references/
-│   │   ├── rules.md                   ← URL 处理 / 双语对照规范
-│   │   ├── translation-prompt.md      ← 三步法完整 prompt
-│   │   ├── design-system.md           ← 视觉系统说明
-│   │   ├── checklist.md               ← 输出前自检
-│   │   ├── lessons-learned.md         ← 历史踩坑总结
-│   │   ├── poster-template.html       ← 海报模式模板(无水印)
-│   │   └── poster-rules.md            ← 海报模式工作流
+│   ├── SKILL.md                       ← 8 阶段主流程(只做路由,到站才读 reference)
+│   ├── references/                    ← 按阶段一份
+│   │   ├── ingest.md                  ← 1 URL 处理 / 抓取 / 发布日期
+│   │   ├── prep-and-modes.md          ← 2 断句 / 说话人 / 中英模式判定
+│   │   ├── clean.md                   ← 3 中文 ASR 后处理三步法
+│   │   ├── render.md                  ← 6 版型 / 设计系统
+│   │   ├── translate.md               ← 5 翻译四步法
+│   │   ├── verify.md                  ← 7 输出前自检清单
+│   │   ├── publish.md                 ← 8 产物约定 / 部署
+│   │   └── lessons-learned.md         ← 历史踩坑总结(只增不改)
 │   ├── scripts/
-│   │   ├── fetch_youtube.sh           ← yt-dlp 字幕抓取
-│   │   ├── clean_vtt.py               ← VTT 清洗去重
-│   │   └── crop_and_share.py          ← 海报裁剪 + 降采样
-│   └── templates/
-│       └── base.html                  ← 双语 HTML 骨架
+│   │   ├── fetch/                     ← yt-dlp / 小宇宙 / B站 / PDF / 元数据
+│   │   ├── prep/clean_en.py           ← 英文源清洗 + 覆盖率闸
+│   │   ├── lib/glossary_lib.py        ← glossary 单一实现(volc_asr.py 也用这份)
+│   │   ├── enrich/                    ← 时间戳注入 / 正文图自托管
+│   │   ├── verify/entity_coverage.py  ← 中文实体覆盖闸
+│   │   └── publish/                   ← landing 重建 / 中文模式渲染
+│   ├── templates/
+│   │   └── base.html                  ← 双语 HTML 骨架
+│   └── tests/                         ← pytest(152 例)
 ├── examples/                          ← 真实输出样例(社区贡献)
 ├── tools/release.sh                   ← 一键发版脚本(maintainer 用)
 ├── README.md
@@ -87,8 +93,7 @@ bpr-plugin/
 
 - Claude Code(任意版本支持 plugin)
 - `yt-dlp`(YouTube/Bilibili 输入需要):`brew install yt-dlp` 或 `uv tool install yt-dlp`
-- `python3 + Pillow`(海报模式需要):`pip3 install Pillow`
-- Google Chrome(海报模式需要,默认路径 `/Applications/Google Chrome.app/`)
+- `python3`(脚本全部标准库,无第三方依赖)
 - 中文字体(Mac 自带 PingFang SC;Linux 渲染机需要单独装)
 
 ## Config
@@ -119,6 +124,6 @@ MIT — see [LICENSE](./LICENSE).
 - ✅ 改进翻译三步法的失败案例(往 `lessons-learned.md` 加 L# 条目)
 - ✅ 优化 checklist / 加新触发词 / 新输入源支持
 - ⚠️ 改 `templates/base.html` 视觉 / 改触发命令 — 慎重
-- ❌ 给 `poster-template.html` 默认版加水印 — 硬规则禁止
+- ❌ 往 `glossary.txt` 第 3 列加短错法(CJK <3 字 / 拉丁 <4 字)— 会误伤常用词,`--check-glossary` 会拦
 
 发版历史见 [CHANGELOG.md](./CHANGELOG.md)。

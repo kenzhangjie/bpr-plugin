@@ -6,7 +6,7 @@
 
 ## 输出路径
 
-所有 reader / 海报产物落到:
+所有 reader 产物落到:
 
 ```
 ~/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/
@@ -19,9 +19,9 @@
 ```
 Transcript/(= bpr.ken.solar 部署根)固定结构:
   <stem>.html            阅读器
-  <stem>-poster.png      海报(/bpr all 时)
   images/<stem>/         essay 正文自托管图
   index.html             landing(build_index 重建)
+  (<stem>-poster.png 已废:海报分支 1.7.3 移除,0 篇用过)
 部署:cd 到 Transcript 目录 → brctl download . → 用 proxy 直连跑 vercel --prod --yes
 (proxy 直连指:env -u ALL_PROXY -u all_proxy -u HTTP_PROXY -u http_proxy -u HTTPS_PROXY -u https_proxy -u NODE_USE_ENV_PROXY vercel --prod --yes;长连接被 GFW/undici 掐会失败)
 ```
