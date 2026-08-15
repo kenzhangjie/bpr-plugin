@@ -5,6 +5,43 @@ All notable changes to this plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.7.4 — 2026-08-15
+
+**逐窗覆盖闸此前基本抓不到丢句 —— 它一直在比错的东西;顺带修掉一个恒响的假警报和一个相对路径 bug。**
+
+### Fixed
+
+- **逐窗覆盖闸对真丢句不敏感**(最要紧的一条)。`finalize()` 拿**每个源窗**去比
+  **整份输出**的词表(`out_c`),而 `_cov` 用的是多重集下界 `min(需要, 拥有)`。
+  一份 15,000 词的稿子里,任一窗的词几乎都能在别处找到 —— 某窗整段丢掉,分数照样
+  接近 1。真实数据实测:删掉 5 句正文,逐窗最低仍有 **0.990**,直接放行。
+  - 现在按词序位置把源窗映射到**输出的同位片段**再比,单侧留
+    `WINDOW_MARGIN_WORDS = 150` 词余量吸收纠错/拆 turn 造成的漂移。
+    同一变异现在报 `#1(0.949)`,并指向删句的那一窗;整个 turn(43 句)丢失报 `#13(0.700)`。
+  - **为什么以前没发现**:既有测试 `localizes_the_dropped_window` 用的是互不重叠的
+    词表(`alpha bravo` vs `foxtrot golf`),比整篇也能发现丢失 —— 真实稿子不长那样。
+    新增的回归用**近邻没有、远处有**的真实形态词表,并断言窗远大于余量
+    (小窗会让局部片段被余量撑成整篇,测试退化成永远为真)。
+- **`[music]` 让覆盖闸恒响假警报**。PREP 明令子代理删掉 `[music]` / `[applause]` /
+  `[ __ ]` 这些字幕噪声标记,而 `norm_words` 把 `[music]` 算成一个词 "music",
+  于是**照做反而掉分**:151 词的片头删 4 个 `[music]` = 0.974,卡在 0.98 闸下,
+  正文一个字没丢。现在 `norm_words` 先丢掉整个 `[bracketed]` 段(两侧一视同仁),
+  与 `add_timestamps.py` 早有的同名函数对齐。
+  - 这条和上一条是连着的:这个假警报长期在响,掩盖了逐窗闸其实不工作 ——
+    "抓到过丢句"其实抓到的是 `[music]`。恒响的闸等于没有闸,还会给出虚假信心。
+- **`fetch_youtube.sh` 用相对路径调用必挂**。第 35 行 `cd "$OUT_DIR"` 在算
+  `SCRIPT_DIR` **之前**,而 `BASH_SOURCE` 是调用方写的路径 —— 相对调用在 cd 之后
+  就解析不到,报 `cd: scripts/fetch: No such file or directory`,读起来像装坏了或
+  版本不对,其实与版本无关。`SCRIPT_DIR` 已挪到 cd 之前。
+
+### Tests
+
+- 3 条新回归,均已用**变异证据**验过(在修复前的实现上全部失败):
+  `test_norm_words_drops_bracketed_caption_markers`、
+  `test_finalize_noise_markers_do_not_lower_coverage`、
+  `test_finalize_per_window_catches_drop_despite_shared_vocabulary`。
+- 全量 155 passed。
+
 ## v1.7.3 — 2026-08-07
 
 **修一个正在静默改错内容的专名替换 + 三处闸门从"喊口号"变成"能执行" + 删掉零使用的海报分支。**

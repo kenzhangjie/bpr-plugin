@@ -206,3 +206,48 @@ def test_finalize_proper_noun_correction_does_not_lower_coverage():
     mappings = {"Opening Eye": "OpenAI", "Codeex": "Codex", "Ambercino": "Ambrosino"}
     r = ce.finalize(turns, raw, mappings)
     assert r["ok"] is True and r["coverage"] >= 0.98
+
+def test_norm_words_drops_bracketed_caption_markers():
+    """`[music]` / `[ __ ]` 是字幕噪声标记,不参与覆盖率计数。"""
+    assert ce.norm_words("we [music] shipped [ __ ] it") == ["we", "shipped", "it"]
+
+
+def test_finalize_noise_markers_do_not_lower_coverage():
+    """回归:PREP 明令删掉 `[music]`,照做不该掉分。
+
+    修复前:源侧 `[music]` 被算成一个词 "music",子代理按规矩删掉它,覆盖率就往下掉。
+    一个 151 词的片头删 4 个 `[music]` = 0.974,卡在 0.98 闸下,而正文一个字没丢。
+    """
+    raw = "[music] we shipped it [music] and it worked [music]"
+    turns = [{"speaker": "A", "sents": ["we shipped it", "and it worked"]}]
+    r = ce.finalize(turns, raw, {})
+    assert r["coverage"] == 1.0 and r["ok"] is True
+
+
+def test_finalize_per_window_catches_drop_despite_shared_vocabulary():
+    """回归:逐窗覆盖必须比**同位输出片段**,不能比整份输出。
+
+    上面那个 `localizes_the_dropped_window` 用的是互不重叠的词表(alpha/bravo vs
+    foxtrot/golf),所以比整篇也能发现丢失 —— 真实稿子不长那样。
+
+    真实形态是中间态:一段话的用词,**近邻里没有、远处别的段落里有**。这里照这个
+    形态造 —— 每窗 = 大量共享虚词 + 一块专题词,专题词块 i 同时出现在第 i 窗和第
+    i+4 窗。丢掉第 4 窗:它的专题词在第 0 窗仍在,比整篇时全部命中、分数接近 1
+    (旧实现放行);比同位片段时,近邻第 3/5 窗没有这些词,立刻掉下来。
+
+    窗必须是**真实尺度**(远大于 WINDOW_MARGIN_WORDS),否则局部片段会被余量撑成
+    整篇,测试退化成永远为真 —— 第一版(22 词的窗)就踩了这个坑。
+    """
+    filler = ("the fund manager is going to look at that data and say it does not "
+              "move the number so we will not pay for it this quarter").split()
+    windows = []
+    for i in range(8):
+        block = " ".join([f"topic{i % 4}alpha topic{i % 4}beta topic{i % 4}gamma"] * 30)
+        windows.append(" ".join(filler * 16) + " " + block)
+    assert len(windows[0].split()) > 3 * ce.WINDOW_MARGIN_WORDS, "窗要远大于余量才有意义"
+    raw = " >> ".join(windows)
+    kept = [w for i, w in enumerate(windows) if i != 4]      # ← 第 5 窗整个丢掉
+    turns = [{"speaker": "A", "sents": [w]} for w in kept]
+    r = ce.finalize(turns, raw, {}, windows=windows)
+    assert r["ok"] is False, "共享词表下的丢窗必须被抓到"
+    assert r["worst_window"]["index"] == 4, f"应指向第 4 窗,实际 {r['worst_window']}"

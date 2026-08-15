@@ -31,10 +31,15 @@ if ! command -v yt-dlp >/dev/null 2>&1; then
   exit 3
 fi
 
+# Resolved BEFORE the cd below: BASH_SOURCE is whatever path the caller typed,
+# so a relative invocation (`bash scripts/fetch/fetch_youtube.sh …`) stops
+# resolving the moment the working directory changes. Doing it after the cd
+# failed with "cd: scripts/fetch: No such file or directory", which reads like a
+# broken install rather than a path bug.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 mkdir -p "$OUT_DIR"
 cd "$OUT_DIR"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Cookie strategy: YouTube increasingly blocks unauthenticated requests
 # ("Sign in to confirm you're not a bot"). Try Chrome cookies first, fall

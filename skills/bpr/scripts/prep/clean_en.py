@@ -44,8 +44,17 @@ def load_mappings(path: str) -> dict:
 
 
 def norm_words(s: str) -> list[str]:
+    """归一化成词表,用于覆盖率比对。
+
+    `[bracketed]` 整段先丢掉,两侧一视同仁 —— 字幕里的 `[music]` / `[applause]` /
+    `[ __ ]` 是噪声标记,PREP 明令子代理删掉它们。留着计数的话,「照做」反而会掉分:
+    一个 151 词的片头删掉 4 个 `[music]`,覆盖率就是 0.974,卡在 0.98 闸下,而正文
+    一个字没丢。恒响的闸等于没有闸,只会训练人忽略它。
+    `add_timestamps.py` 的 `norm_words` 早就这么做了,这里跟它对齐。
+    """
     import html
     s = html.unescape(s).lower()
+    s = re.sub(r"\[[^\]]*\]", " ", s)        # drop [bracketed] caption markers
     s = re.sub(r"[^a-z0-9 ]", " ", s)
     return s.split()
 
@@ -79,6 +88,10 @@ def added_ratio(src: str, out: str) -> float:
 #: added_ratio 超过它就在 stdout 提醒(不影响退出码)。
 ADDED_WARN = 0.05
 
+#: 逐窗对齐时给输出片段留的单侧余量(词)。专名纠错、拆合并 turn 都会让输出相对
+#: 源文轻微伸缩,余量太小会把正常漂移误判成丢句;太大又退化回"比整篇"。
+WINDOW_MARGIN_WORDS = 150
+
 
 def finalize(turns: list, raw: str, mappings, gate: float = 0.98,
              windows: list | None = None) -> dict:
@@ -105,9 +118,29 @@ def finalize(turns: list, raw: str, mappings, gate: float = 0.98,
     per_window = []
     worst = None
     if windows:
-        for i, w in enumerate(windows):
-            wtext = w if isinstance(w, str) else " ".join(map(str, w))
-            wcov = _cov(Counter(norm_words(corr.apply(wtext))), out_c)
+        # 逐窗覆盖必须比**对应位置的输出片段**,不能比整份输出。
+        #
+        # 原来这里拿每个源窗去比整篇 `out_c`:一份 15,000 词的稿子里,任何一窗的
+        # 常用词几乎都能在别处找到,而 `_cov` 用的是多重集下界(min(需要,拥有)),
+        # 所以某窗整段丢掉,分数照样接近 1。实测删掉 5 句真正文,逐窗最低仍有
+        # 0.990 —— 闸门形同虚设,过去"抓到过"是因为噪声标记造成的假阳性在响。
+        #
+        # 现在按词序位置把源窗映射到输出的同位片段再比。窗序 == 输出 turn 序是
+        # 流水线契约(逐窗派发、按窗序拼装),边界留余量吸收纠错带来的漂移。
+        out_words = norm_words(joined)
+        wseqs = [norm_words(corr.apply(w if isinstance(w, str) else " ".join(map(str, w))))
+                 for w in windows]
+        total_src = sum(len(s) for s in wseqs) or 1
+        n_out = len(out_words)
+        cursor = 0
+        for i, wseq in enumerate(wseqs):
+            a, b = cursor, cursor + len(wseq)
+            cursor = b
+            lo = int(a * n_out / total_src)
+            hi = int(b * n_out / total_src)
+            margin = max(WINDOW_MARGIN_WORDS, (hi - lo) // 2)
+            local = Counter(out_words[max(0, lo - margin):min(n_out, hi + margin)])
+            wcov = _cov(Counter(wseq), local)
             row = {"index": i, "coverage": round(wcov, 4), "ok": wcov >= gate}
             per_window.append(row)
             if worst is None or wcov < worst["coverage"]:
