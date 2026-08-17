@@ -5,6 +5,43 @@ All notable changes to this plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.0.0 — 2026-08-18
+
+**触发命令从 `/bpr` 改为 `/ddr`（Deep Dive Reading）。破坏性改动 —— 老的 `/bpr` 不再存在。**
+
+改名的理由:`bpr`(bilingual podcast reader)只描述了英文双语那一半。这个技能自 1.4.0
+起就会对中文素材自动切到 "TL;DR + 非共识 + 章节回顾" 浓缩模式,而那条路径里既没有
+"bilingual" 也没有 "podcast"。`ddr`(deep dive reading)同时盖得住两种模式。
+
+### Changed
+
+- **触发命令 `/bpr` → `/ddr`**,并同步改了 `plugin.json` / `marketplace.json` 的插件名与
+  `SKILL.md` 的 frontmatter `name`。安装命令变成 `/plugin install ddr@bpr-marketplace`。
+- 技能目录 `skills/bpr/` → `skills/ddr/`。连带更新了三处**会真正执行**的路径:
+  `references/render.md` 的 `--base skills/ddr/templates/base.html`、
+  `references/ingest.md` 里两条 glossary 体检命令、`scripts/lib/glossary_lib.py` 的注释路径。
+- `.github/workflows/validate.yml` 里 4 处硬编码 `skills/bpr/` 一并更新 —— 漏掉会让每次
+  push 的校验直接失败。
+
+### 刻意没有改
+
+- **`bpr.ken.solar`**(输出域名)与 `build_index.py` 的 `BASE_URL`。存量阅读页链接全部保留。
+- **`localStorage` 的 `bpr-sort` / `bpr-theme` 键**。改了会静默重置线上站已有的主题/排序偏好。
+- 已发布站的可见品牌文字(`<title>BPR · Read in Both Worlds`、`og:site_name`、页脚)。
+  域名既然还是 `bpr.ken.solar`,把标题改成 DDR 只会自相矛盾。
+- 仓库名 `bpr-plugin`、marketplace id `bpr-marketplace`(改后者需要重新 add marketplace)。
+- `CHANGELOG.md` 既有条目与 `docs/superpowers/**` 里的历史计划/设计文档 —— 那些是历史记录。
+
+### 升级方法
+
+```
+/plugin uninstall bpr
+/plugin marketplace update bpr-marketplace
+/plugin install ddr@bpr-marketplace
+```
+
+改插件名等于 Claude 眼里的新插件,所以旧的 `bpr` 需要手动卸载,否则 `/bpr` 和 `/ddr` 会并存。
+
 ## v1.7.4 — 2026-08-15
 
 **逐窗覆盖闸此前基本抓不到丢句 —— 它一直在比错的东西;顺带修掉一个恒响的假警报和一个相对路径 bug。**

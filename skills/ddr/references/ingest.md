@@ -24,7 +24,7 @@
 
 ## URL 输入处理
 
-`/bpr <URL>` 触发后,先**判定 URL 类型**,走不同分支。
+`/ddr <URL>` 触发后,先**判定 URL 类型**,走不同分支。
 
 ### 分支表
 
@@ -36,7 +36,7 @@
 | **Bilibili / B 站**(`bilibili.com/video/BV<id>` / `b23.tv/<short>`)| 走"小宇宙 / Bilibili → 飞书妙记 一站式流程"(下面),先尝试 yt-dlp 字幕,无字幕则下载音频走妙记 |
 | Apple Podcasts / Spotify / Overcast | 不能直接抓,先问用户能不能给 YouTube/小宇宙 URL(同期一般多平台都有) |
 | Paywall / 登录墙(WSJ / NYT / 付费 Substack)| curl 失败时**直接告诉用户**抓不到,让 ta 粘 raw text |
-| PDF 链接 | 让用户先下载到本地,再 `/bpr <文件路径>` → 走下面「本地 PDF 一站式流程」 |
+| PDF 链接 | 让用户先下载到本地,再 `/ddr <文件路径>` → 走下面「本地 PDF 一站式流程」 |
 
 ### 抓取命令(博客 / essay)
 
@@ -251,9 +251,9 @@ python3 ~/.config/volc/volc_asr.py "$AUDIO_URL" "$WORKDIR/transcript.txt"
 > 「小红书 / 小红帽 / 小红点」改成「肖弘书 / 肖弘帽 / 肖弘点」——CLEAN 不会纠(它被
 > 告知信 glossary),保真闸不查(它只查丢没丢)。
 > 现在 `volc_asr.py` 不再自己实现替换,改为 import 插件的
-> `skills/bpr/scripts/lib/glossary_lib.py`(保护名单 + 词边界 + 长度闸)。
+> `skills/ddr/scripts/lib/glossary_lib.py`(保护名单 + 词边界 + 长度闸)。
 > 插件找不到时**跳过这一层**并 WARN,不回退到旧实现。
-> 往第 3 列加词之后跑一次体检:`python3 <插件>/skills/bpr/scripts/prep/clean_en.py --check-glossary`。
+> 往第 3 列加词之后跑一次体检:`python3 <插件>/skills/ddr/scripts/prep/clean_en.py --check-glossary`。
 
 > 转录质量仍可能有专名错词(中英混录里英文品牌名最易错)→ BPR 翻译 / 渲染阶段按上下文修正,
 > 新踩坑的无歧义专名顺手加进 `glossary.txt` 第 3 列(≥3 字 CJK / ≥4 字拉丁),下次自动生效。

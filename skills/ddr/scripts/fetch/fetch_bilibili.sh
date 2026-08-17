@@ -92,7 +92,7 @@ if [[ -n "$VTT_FILE" ]]; then
   echo "✓ Done with subs. Outputs in $OUT_DIR:"
   ls -la transcript.txt metadata.json 2>/dev/null
   echo ""
-  echo "Next step: feed transcript.txt to /bpr (with metadata.json for hero context)."
+  echo "Next step: feed transcript.txt to /ddr (with metadata.json for hero context)."
   exit 0
 fi
 

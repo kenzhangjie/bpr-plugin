@@ -1,15 +1,15 @@
 ---
-name: bpr
-description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长文 article 转换为编辑设计风格的阅读 HTML。**英文**素材默认双语对照;**中文**素材自动切换到 "TL;DR + 非共识 + 章节回顾" 浓缩模式(CJK ≥ 60% 自动判定)。当用户输入 "/bpr" 后跟字幕、transcript、播客文本、博客 URL 或粘贴的长文,或明确要求"双语阅读器"/"podcast 整理"/"博客整理"时触发。覆盖 SRT、纯文本 transcript、有时间戳的 transcript、博客/essay 四种内容;URL 输入支持 YouTube / 小宇宙 / Bilibili。输出单文件 HTML,包含 Hero、TL;DR、(中文模式) 非共识 takes、章节正文、目录、深色模式。
+name: ddr
+description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长文 article 转换为编辑设计风格的阅读 HTML。**英文**素材默认双语对照;**中文**素材自动切换到 "TL;DR + 非共识 + 章节回顾" 浓缩模式(CJK ≥ 60% 自动判定)。当用户输入 "/ddr" 后跟字幕、transcript、播客文本、博客 URL 或粘贴的长文,或明确要求"双语阅读器"/"podcast 整理"/"博客整理"时触发。覆盖 SRT、纯文本 transcript、有时间戳的 transcript、博客/essay 四种内容;URL 输入支持 YouTube / 小宇宙 / Bilibili。输出单文件 HTML,包含 Hero、TL;DR、(中文模式) 非共识 takes、章节正文、目录、深色模式。
 ---
 
-# BPR · Bilingual Podcast / Essay Reader
+# DDR · Deep Dive Reading（双语精读 / 中文浓缩）
 
 ## 触发条件
-- 用户输入 `/bpr <内容>` 或 `/bpr` 后跟 transcript / 博客 URL / 长文文本 → 出 HTML
-- `/bpr all <内容>` 仍然接受,但**等同于 `/bpr`**(海报已于 1.7.3 移除,见下)
+- 用户输入 `/ddr <内容>` 或 `/ddr` 后跟 transcript / 博客 URL / 长文文本 → 出 HTML
+- `/ddr all <内容>` 仍然接受,但**等同于 `/ddr`**(海报已于 1.7.3 移除,见下)
 - 用户上传字幕文件并要求"做成双语阅读器"
-- 用户明确说"按 BPR 规则"
+- 用户明确说"按 DDR 规则"
 
 ## 流水线 · 8 阶段
 
@@ -28,7 +28,7 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 
 > **海报分支已于 1.7.3 移除**:上线两个多月、120 篇产出里 **0 张海报**,而它占着
 > 207 行 reference + 879 行模板 + 一个脚本,每次读 SKILL.md 都得绕过它。
-> `/bpr all` 保留为别名(不报错,行为 == `/bpr`)。真要海报,去 git 历史里 1.7.2
+> `/ddr all` 保留为别名(不报错,行为 == `/ddr`)。真要海报,去 git 历史里 1.7.2
 > 及更早的 tag 捞那三个文件(reference / 模板 / crop 脚本)。
 
 > **抓取硬提醒**:YouTube / 小宇宙 / Bilibili 走 INGEST 的 `scripts/fetch/*`,**不要**假装能直接 WebFetch 到 transcript;小宇宙/Bilibili 无字幕内容必经飞书妙记转录(见 `references/ingest.md`)。
@@ -63,7 +63,7 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 
 ## 修饰词
 `只英文`(跳过中文)· `深色`(暗色,已默认可切)· `简洁`(减装饰)· `正式`(去口语化)· `速读`(默认只显中文)· `学习`(双语并排两列)· `带批注`(callout 加 `[Ken note]`)。
-> 海报相关修饰词与 `/bpr all` 子命令**均已失效**(1.7.3 移除海报分支)。
+> 海报相关修饰词与 `/ddr all` 子命令**均已失效**(1.7.3 移除海报分支)。
 
 ## 错误处理
 - < 500 字:提示并询问要不要继续。

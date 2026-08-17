@@ -965,7 +965,7 @@ def render_index(entries: list[dict]) -> str:
     </ul>
 
     <footer>
-      <div>by <strong style="color:var(--ink-soft)">ken</strong> · built with <code style="font-family:ui-monospace,Menlo,monospace;background:rgba(176,74,47,.08);padding:1px 6px;border-radius:4px;color:var(--accent)">/bpr</code></div>
+      <div>by <strong style="color:var(--ink-soft)">ken</strong> · built with <code style="font-family:ui-monospace,Menlo,monospace;background:rgba(176,74,47,.08);padding:1px 6px;border-radius:4px;color:var(--accent)">/ddr</code></div>
       <div>{count} entries · last build {today}</div>
     </footer>
 
@@ -1012,7 +1012,7 @@ def render_posters_page(entries: list[dict]) -> str:
             '<div class="empty">'
             '<p>还没有海报。</p>'
             '<p style="font-size:14px;color:var(--ink-faint);margin-top:8px">'
-            '跑 <code>/bpr all &lt;URL&gt;</code> 会附带生成 hidpi 海报。</p>'
+            '跑 <code>/ddr all &lt;URL&gt;</code> 会附带生成 hidpi 海报。</p>'
             '</div>'
         )
     else:
@@ -1168,7 +1168,7 @@ def render_posters_page(entries: list[dict]) -> str:
       <h1>Visual <em>Library</em></h1>
       <div class="hero-zh">海报图册 · 每张都是 1080 宽长图,微信 / Telegram 友好</div>
       <p class="lede">
-        每篇 <em>/bpr all</em> 都会附带生成一张 <em>hidpi</em>(2160 宽)的长图海报——把双语 HTML 里最锋利的金句、stats、takeaway 浓缩到一张可分享的视觉里。
+        每篇 <em>/ddr all</em> 都会附带生成一张 <em>hidpi</em>(2160 宽)的长图海报——把双语 HTML 里最锋利的金句、stats、takeaway 浓缩到一张可分享的视觉里。
         点缩略图放大,点标题进入完整 HTML reader。
       </p>
       <div class="meta-bar">

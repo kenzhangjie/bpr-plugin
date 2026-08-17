@@ -1,7 +1,7 @@
 # 翻译四步法 · Analyze → Translate → Review → Polish
 
-> 📌 **本文件是 BPR 内部副本,服务于 /bpr 流水线**。
-> 如果你**不在** /bpr 流程中,而是想单独翻译一段英文 → 用独立的 [`translate` skill](~/.claude/skills/translate/SKILL.md)(自动触发,触发词:翻译这段 / 帮我翻 / translate this 等)。
+> 📌 **本文件是 BPR 内部副本,服务于 /ddr 流水线**。
+> 如果你**不在** /ddr 流程中,而是想单独翻译一段英文 → 用独立的 [`translate` skill](~/.claude/skills/translate/SKILL.md)(自动触发,触发词:翻译这段 / 帮我翻 / translate this 等)。
 > 两边方法论保持同步(都是四步法)。改一边请同步另一边。
 
 ## 为什么用四步法(2026-07 从三步升级)
@@ -14,7 +14,7 @@
 
 ---
 
-## 🤖 给 Claude 的执行指令(/bpr 触发时按这个走)
+## 🤖 给 Claude 的执行指令(/ddr 触发时按这个走)
 
 **BPR 默认分工 = 每篇一次 Analyze(全局)+ 每章两轮子代理(Translate 一轮 → 独立 Review+Polish 一轮)。**
 仍然守抗压缩铁律:**英文由你 verbatim 持有,子代理只产出中文**——两轮都只回中文,英文原文永远在你手里。

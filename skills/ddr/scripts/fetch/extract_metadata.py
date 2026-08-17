@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Extract publish-date / title / author / publication slug from any blog or
-article URL — for use in /bpr filename construction.
+article URL — for use in /ddr filename construction.
 
 Usage:
   python3 extract_metadata.py <URL>

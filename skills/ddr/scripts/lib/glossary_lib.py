@@ -6,7 +6,7 @@
 同一份「错法 → 正确名」替换逻辑过去在两处各写了一遍:
 
 - `~/.config/volc/volc_asr.py` —— `text.replace(wrong, right)`
-- `skills/bpr/scripts/prep/clean_en.py` —— `apply_correct_table()` 逐字符匹配
+- `skills/ddr/scripts/prep/clean_en.py` —— `apply_correct_table()` 逐字符匹配
 
 **两处都没有词边界**,于是 `肖弘|20|小红,小宏,小虹` 这一行把「小红书」改成
 「肖弘书」、「小红帽」改成「肖弘帽」。而且它发生在 ASR 输出那一刻(CLEAN 之前),

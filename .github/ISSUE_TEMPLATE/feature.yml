@@ -18,7 +18,7 @@ body:
       description: 可选。你自己设想的 API / 修饰词 / 输出形态。
       placeholder: |
         - 加修饰词 `精简` → 中文段落只输出关键句,跳过填充
-        - 命令格式:`/bpr <url> 精简`
+        - 命令格式:`/ddr <url> 精简`
   - type: textarea
     id: alternatives
     attributes:
@@ -30,5 +30,5 @@ body:
       label: 示例
       description: 一个具体的 input → expected output 示例。
       placeholder: |
-        Input: "/bpr https://lennys-podcast.com/xxx 精简"
+        Input: "/ddr https://lennys-podcast.com/xxx 精简"
         Expected: TL;DR 部分只 5 条,正文跳过 q&a 段...

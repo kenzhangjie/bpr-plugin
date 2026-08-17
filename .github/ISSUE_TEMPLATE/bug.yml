@@ -19,8 +19,8 @@ body:
     id: command
     attributes:
       label: 你跑的命令
-      description: 完整的 /bpr 调用,包括所有修饰词
-      placeholder: "/bpr https://... 海报"
+      description: 完整的 /ddr 调用,包括所有修饰词
+      placeholder: "/ddr https://... 海报"
       render: shell
     validations:
       required: true

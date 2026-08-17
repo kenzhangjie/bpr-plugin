@@ -10,7 +10,7 @@
   },
   "plugins": [
     {
-      "name": "bpr",
+      "name": "ddr",
       "source": "./",
       "description": "把 podcast/transcript/字幕/博客 essay 转成编辑设计风格的阅读 HTML。英文双语,中文 TL;DR+非共识+章节回顾。支持 YouTube/小宇宙/Bilibili 输入",
       "version": "1.7.4",

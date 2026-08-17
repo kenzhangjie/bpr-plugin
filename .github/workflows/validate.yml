@@ -49,7 +49,7 @@ jobs:
         run: |
           python3 -c "
           import re, yaml, sys
-          content = open('skills/bpr/SKILL.md').read()
+          content = open('skills/ddr/SKILL.md').read()
           m = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
           assert m, 'SKILL.md missing YAML frontmatter'
           fm = yaml.safe_load(m.group(1))
@@ -64,11 +64,11 @@ jobs:
           import re, os, sys
           errors = []
           # Check SKILL.md references to references/, scripts/, templates/
-          content = open('skills/bpr/SKILL.md').read()
+          content = open('skills/ddr/SKILL.md').read()
           # Find paths like references/foo.md, scripts/bar.sh, templates/x.html
           referenced = re.findall(r'(?:references|scripts|templates)/[\w\-/.]+\.(?:md|sh|py|html)', content)
           referenced = sorted(set(referenced))
-          base = 'skills/bpr/'
+          base = 'skills/ddr/'
           for path in referenced:
               full = os.path.join(base, path)
               if not os.path.exists(full):
@@ -78,7 +78,7 @@ jobs:
               for e in errors:
                   print(e)
               sys.exit(1)
-          print(f'✓ All {len(referenced)} referenced files exist in skills/bpr/')
+          print(f'✓ All {len(referenced)} referenced files exist in skills/ddr/')
           "
 
       - name: Check no hardcoded user paths leaked

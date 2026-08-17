@@ -1,5 +1,5 @@
 #!/bin/bash
-# fetch_youtube.sh — pull subs + metadata from a YouTube URL, ready for /bpr.
+# fetch_youtube.sh — pull subs + metadata from a YouTube URL, ready for /ddr.
 #
 # Usage:
 #   ./fetch_youtube.sh <youtube-url> <output-dir>
@@ -111,5 +111,5 @@ echo "✓ Done. Outputs in $OUT_DIR:"
 ls -la transcript.txt metadata.json 2>/dev/null
 
 echo ""
-echo "Next step: feed transcript.txt to /bpr along with metadata.json for"
+echo "Next step: feed transcript.txt to /ddr along with metadata.json for"
 echo "title / uploader / host context."

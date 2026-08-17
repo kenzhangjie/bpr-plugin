@@ -10,18 +10,18 @@
 
 ```
 /plugin marketplace add kenzhangjie/bpr-plugin
-/plugin install bpr@bpr-marketplace
+/plugin install ddr@bpr-marketplace
 ```
 
 ## Usage
 
 ```
-/bpr <YouTube URL>
-/bpr <博客 URL>
-/bpr <粘贴的英文 transcript>
-/bpr <上传的 SRT/VTT 字幕>
-/bpr <本地 PDF 路径>                 ← 研报 / 白皮书 / 书籍章节
-/bpr <小宇宙 / Bilibili URL>         ← 中文播客,走 ASR 转录
+/ddr <YouTube URL>
+/ddr <博客 URL>
+/ddr <粘贴的英文 transcript>
+/ddr <上传的 SRT/VTT 字幕>
+/ddr <本地 PDF 路径>                 ← 研报 / 白皮书 / 书籍章节
+/ddr <小宇宙 / Bilibili URL>         ← 中文播客,走 ASR 转录
 ```
 
 ## What it does
@@ -60,7 +60,7 @@ bpr-plugin/
 │   ├── workflows/validate.yml         ← CI: JSON / frontmatter / 引用完整性校验
 │   ├── ISSUE_TEMPLATE/{bug,feature}.yml
 │   └── pull_request_template.md
-├── skills/bpr/
+├── skills/ddr/
 │   ├── SKILL.md                       ← 8 阶段主流程(只做路由,到站才读 reference)
 │   ├── references/                    ← 按阶段一份
 │   │   ├── ingest.md                  ← 1 URL 处理 / 抓取 / 发布日期
@@ -100,14 +100,14 @@ bpr-plugin/
 
 首次使用时,skill 会询问输出目录(`<output_dir>`),默认建议 `~/Documents/Transcript/`。
 
-如果不需要默认值,直接在 `/bpr` 调用里指定路径即可。
+如果不需要默认值,直接在 `/ddr` 调用里指定路径即可。
 
 ## Tips
 
 - **大文件分段**:超过 50K 字会询问要不要拆 part
-- **速读模式**:`/bpr <url> 速读` → 折叠英文,默认只显中文
-- **学习模式**:`/bpr <url> 学习` → 双语并排两列
-- **正式模式**:`/bpr <url> 正式` → 去口语化("uh / um" 等省略)
+- **速读模式**:`/ddr <url> 速读` → 折叠英文,默认只显中文
+- **学习模式**:`/ddr <url> 学习` → 双语并排两列
+- **正式模式**:`/ddr <url> 正式` → 去口语化("uh / um" 等省略)
 
 ## Examples
 

@@ -115,7 +115,7 @@ CSS 已经写在 `templates/base.html`(`.bilingual` / `.bilingual .en` / `.bilin
 ```bash
 python3 scripts/publish/render_zh.py \
   --clean "$WORKDIR/clean.txt" --structure "$WORKDIR/structure.json" \
-  --raw "$WORKDIR/transcript.txt" --base skills/bpr/templates/base.html \
+  --raw "$WORKDIR/transcript.txt" --base skills/ddr/templates/base.html \
   --meta "$WORKDIR/metadata.json" --out "$OUT.html"
 ```
 - 输入:CLEAN 书面正文(turn 头 = `Speaker N HH:MM:SS` 独占行,见 clean.md 硬约束)+ STRUCTURE 的 JSON(hero/tldr/contrarian/chapters,含 `speakers` 映射)+ 火山原始底档。

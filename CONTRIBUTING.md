@@ -9,10 +9,10 @@ git clone git@github.com:kenzhangjie/bpr-plugin.git
 cd bpr-plugin
 
 # 链接到本地 Claude 测试
-ln -s "$(pwd)/skills/bpr" ~/.claude/skills/bpr
+ln -s "$(pwd)/skills/ddr" ~/.claude/skills/ddr
 
 # 在 Claude Code 里跑:
-/bpr <某个 podcast url>
+/ddr <某个 podcast url>
 # 跑通且效果对 → 提 PR
 ```
 
@@ -30,7 +30,7 @@ ln -s "$(pwd)/skills/bpr" ~/.claude/skills/bpr
 ⚠️ **慎重**:
 - 改 `references/translation-prompt.md` 的核心三步法 — 这是项目灵魂,必须有充分论证
 - 改 `templates/base.html` 的 CSS — 视觉一致性是产品价值,不要无谓改动
-- 改触发命令 `/bpr` — 会破坏老用户工作流
+- 改触发命令 `/ddr` — 会破坏老用户工作流
 
 ❌ **不接受**:
 - 改 `references/lessons-learned.md` 的历史条目(只能新增,不能删/改)
@@ -84,7 +84,7 @@ python3 -c "import json; json.load(open('.claude-plugin/plugin.json')); json.loa
 # 2. SKILL.md frontmatter 合法
 python3 -c "
 import re, yaml
-content = open('skills/bpr/SKILL.md').read()
+content = open('skills/ddr/SKILL.md').read()
 m = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
 assert m, 'no frontmatter'
 fm = yaml.safe_load(m.group(1))
@@ -101,7 +101,7 @@ CI 也会自动跑这些。
 
 - patch (`1.0.0` → `1.0.1`):改 prompt / 修 typo / fix bug
 - minor (`1.0.0` → `1.1.0`):加新触发词 / 新 reference
-- major (`1.0.0` → `2.0.0`):破坏性改动(改 `/bpr` 触发、删功能)
+- major (`1.0.0` → `2.0.0`):破坏性改动(改 `/ddr` 触发、删功能)
 
 ## Release flow(仅 maintainer)
 

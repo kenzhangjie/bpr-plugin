@@ -164,7 +164,7 @@ For more information, pass 'verbose: true' in the second argument to fetch()
 
 ### 症状
 
-跑 `/bpr https://andrewchen.com/the-adjacent-user-theory/` 时,
+跑 `/ddr https://andrewchen.com/the-adjacent-user-theory/` 时,
 WebFetch 返回的"原文"长度约 2000 词,带着 `## Overview` / `## Core Concept`
 这种结构化小标题,看起来像散文摘要。
 
