@@ -1,12 +1,12 @@
-# Contributing to bpr-plugin
+# Contributing to ddr-plugin
 
 欢迎 PR。这个项目本质是**一份精心调过的 prompt + 流水线**——所以贡献规则比代码项目宽松一些,但有几条硬规矩。
 
 ## Quick start
 
 ```bash
-git clone git@github.com:kenzhangjie/bpr-plugin.git
-cd bpr-plugin
+git clone git@github.com:kenzhangjie/ddr-plugin.git
+cd ddr-plugin
 
 # 链接到本地 Claude 测试
 ln -s "$(pwd)/skills/ddr" ~/.claude/skills/ddr
@@ -113,5 +113,5 @@ CI 也会自动跑这些。
 
 ## Questions
 
-- 用法问题 → 提 [Issue](https://github.com/kenzhangjie/bpr-plugin/issues)(贴 transcript / URL + 期望 vs 实际输出)
-- 设计讨论 → [Discussions](https://github.com/kenzhangjie/bpr-plugin/discussions)(如果开了)
+- 用法问题 → 提 [Issue](https://github.com/kenzhangjie/ddr-plugin/issues)(贴 transcript / URL + 期望 vs 实际输出)
+- 设计讨论 → [Discussions](https://github.com/kenzhangjie/ddr-plugin/discussions)(如果开了)

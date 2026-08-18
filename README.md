@@ -9,8 +9,8 @@
 在 Claude Code 里:
 
 ```
-/plugin marketplace add kenzhangjie/bpr-plugin
-/plugin install ddr@bpr-marketplace
+/plugin marketplace add kenzhangjie/ddr-plugin
+/plugin install ddr@ddr-marketplace
 ```
 
 ## Usage
@@ -52,7 +52,7 @@ BPR 用三步法(Translate → Reflect → Improve)+ 模板锁定 + 严格 check
 ## What's inside
 
 ```
-bpr-plugin/
+ddr-plugin/
 ├── .claude-plugin/
 │   ├── plugin.json
 │   └── marketplace.json

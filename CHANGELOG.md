@@ -5,6 +5,38 @@ All notable changes to this plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.0.1 — 2026-08-18
+
+**把 v2.0.0 里刻意留下的两个旧名也改了：仓库 `bpr-plugin` → `ddr-plugin`，marketplace
+`bpr-marketplace` → `ddr-marketplace`。** v2.0.0 的条目说这两个"刻意没有改"——那句话在发版
+当时是真的，现在不再成立，以本条为准。
+
+### Changed
+
+- 仓库改名 `kenzhangjie/bpr-plugin` → `kenzhangjie/ddr-plugin`（GitHub 侧有重定向，
+  已有 remote 不改也能用）。连带更新 `CONTRIBUTING.md` 的 clone/Issues/Discussions 链接、
+  `tools/release.sh` 的 releases URL、`README.md` 的安装命令与目录树标签，
+  以及本文件底部的版本链接定义。
+- marketplace 改名 `bpr-marketplace` → `ddr-marketplace`（`marketplace.json` 的
+  `name` 与 `id`）。**这一步不能靠 update 生效** —— marketplace id 是注册键，
+  必须 remove 再 add。
+
+### 仍然没有改
+
+- `bpr.ken.solar`（输出域名）、`build_index.py` 的 `BASE_URL`、`localStorage` 的
+  `bpr-sort` / `bpr-theme` 键、已发布站的可见品牌文字。理由同 v2.0.0：
+  **命令归 DDR，产出物归 BPR**，这个分界是刻意的。
+- `CHANGELOG.md` 的历史条目正文与 `docs/superpowers/**` 里的历史计划/设计文档。
+
+### 升级方法
+
+```
+/plugin uninstall ddr
+/plugin marketplace remove bpr-marketplace
+/plugin marketplace add kenzhangjie/ddr-plugin
+/plugin install ddr@ddr-marketplace
+```
+
 ## v2.0.0 — 2026-08-18
 
 **触发命令从 `/bpr` 改为 `/ddr`（Deep Dive Reading）。破坏性改动 —— 老的 `/bpr` 不再存在。**
@@ -372,8 +404,8 @@ and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - 文件名四种 pattern:single-host podcast / multi-host podcast / single-author essay / multi-author publication
 - MIT license
 
-[Unreleased]: https://github.com/kenzhangjie/bpr-plugin/compare/v1.3.0...HEAD
-[1.3.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.3.0
-[1.2.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.2.0
-[1.1.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.1.0
-[1.0.0]: https://github.com/kenzhangjie/bpr-plugin/releases/tag/v1.0.0
+[Unreleased]: https://github.com/kenzhangjie/ddr-plugin/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/kenzhangjie/ddr-plugin/releases/tag/v1.3.0
+[1.2.0]: https://github.com/kenzhangjie/ddr-plugin/releases/tag/v1.2.0
+[1.1.0]: https://github.com/kenzhangjie/ddr-plugin/releases/tag/v1.1.0
+[1.0.0]: https://github.com/kenzhangjie/ddr-plugin/releases/tag/v1.0.0

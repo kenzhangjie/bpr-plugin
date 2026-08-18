@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Release helper for bpr-plugin.
+# Release helper for ddr-plugin.
 #
 # Usage:
 #   ./tools/release.sh <new-version> "<commit message>"
@@ -93,5 +93,5 @@ echo ""
 echo "✅ Released v${NEW_VERSION}"
 echo ""
 echo "Next:"
-echo "  - Open https://github.com/kenzhangjie/bpr-plugin/releases/new?tag=v${NEW_VERSION}"
+echo "  - Open https://github.com/kenzhangjie/ddr-plugin/releases/new?tag=v${NEW_VERSION}"
 echo "    to write release notes (paste from CHANGELOG)"
