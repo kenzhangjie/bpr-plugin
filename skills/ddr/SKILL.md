@@ -32,10 +32,12 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 > 及更早的 tag 捞那三个文件(reference / 模板 / crop 脚本)。
 
 > **抓取硬提醒**:YouTube / 小宇宙 / Bilibili 走 INGEST 的 `scripts/fetch/*`,**不要**假装能直接 WebFetch 到 transcript;小宇宙/Bilibili 无字幕内容必经飞书妙记转录(见 `references/ingest.md`)。
-> **Substack 播客(Lenny's Podcast 等)必查官方文字稿**(2026-08-23):YouTube 字幕**没有 speaker**,
+> **Substack 播客(Lenny's Podcast 等)默认走官方文字稿**(2026-08-23):YouTube 字幕**没有 speaker**,
 > 先跑 `scripts/fetch/fetch_substack_transcript.py --from-youtube "$WORKDIR/metadata.json"` 拿官方
-> `speaker_map`(**付费期次也拿得到**)。拿到就跳过 PREP 的逐窗归属子代理;**退出码 3 才**退回启发式。
-> 实测数字与原理见 `references/ingest.md` Step B2。
+> `speaker_map`(**付费期次也拿得到**),**拿到就用它当英文正文**,不再用 YT 轨(两边只能选一边,
+> 混用句索引对不上)。跳过 PREP 的逐窗归属;**退出码 3 才**退回 YT 字幕 + 启发式。
+> ⚠️ **专名纠错照跑** —— 官方稿也是机器转录的,错法与 YT 轨一模一样,"官方"只保证说话人和断句。
+> 实测数字见 `references/ingest.md` Step B2。
 > **模式判定**:CJK ≥ 60% → 中文模式,**完全自动**,不接受修饰词覆盖(见 `references/prep-and-modes.md`)。
 > **发布大小写坑**:Transcript 目录若有遗留 `INDEX.html`(大写),会导致 bpr.ken.solar 404 —— `rm INDEX.html` 再跑 build_index(见 `references/publish.md`)。
 

@@ -21,10 +21,17 @@ YouTube 只拿到 auto-subs(无标点、无 speaker)时,PREP 先做退化处理�
 ### 触发条件
 **CJK < 60%**(判定见下「语言检测算法」)且输入是 **transcript 类**(有 `>>` 或 speaker 信号)。**essay(单作者、无说话人轮换的博客/长文)跳过本节**,直接走原有 PREP 流程。
 
-> ⏭ **先看有没有官方 speaker 标注**(2026-08-23 加):INGEST 的 Step B2 若跑成
-> `fetch_substack_transcript.py`,`substack_turns.json` 已经是本节的产出契约格式
-> ——**Step 2 的逐窗说话人归属子代理整段跳过**,只保留 Step 1 的 glossary 扫描
-> (专名纠错仍要做)。省掉 10 个子代理,而且拿到的是**真名字不是推断**。
+> ⏭ **先看有没有官方 speaker 标注**(2026-08-23 加,Substack 播客**默认走这条**):
+> INGEST 的 Step B2 若跑成 `fetch_substack_transcript.py`,`substack_turns.json`
+> 已经是本节的产出契约格式(已切句)——**Step 2 的逐窗说话人归属子代理整段跳过**,
+> 拿到的是**真名字不是推断**,还省掉约 10 个子代理。
+>
+> ⚠️ **但 Step 1 的 glossary 扫描 + 专名纠错一步都不能省**。官方稿同样是机器转录,
+> 实测与 YT 轨**错法完全一致**(`Code Pilot` / `Instruct GPT` / `Dolly` /
+> `stable diffusion` 一个不少)。"官方"只保证说话人和断句,不保证专名。
+> 跳过这层 = 静默出一篇专名全错的稿子。
+> 具体做法:仍跑 `clean_en.py --scan`,把命中项塞进纠错子代理的 prompt,
+> 只是这些子代理**只做专名纠错,不再做说话人归属**。
 >
 > 为什么值得专门加这一步:启发式"提问方 = 主持人"只能二分 host/guest。实测一期
 > Lenny 访谈里,赞助商口播嘉宾整段 12 句被并进主持人,**覆盖闸和加译闸都查不出来**

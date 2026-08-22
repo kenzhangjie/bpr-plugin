@@ -141,7 +141,46 @@ def extract(post_url):
     return p, tr
 
 
-def build(p, tr):
+# 切句时**不许**被当成句号的东西。走 YT 轨那条路时,朴素的 `[.!?]\s` 正则把
+# `cursor.com` / `2.0` / `$1,000` / `geteppo.com/lenny` 全切断了,事后手工补了 8 处。
+# 官方稿本身没有这类断点错误,但切句是我们自己做的 —— 坑要在这一侧防。
+_PROTECT = [
+    # 路径部分**不能以 . 收尾** —— 否则 `vanta.com/lenny. That's ...` 里的句末句号
+    # 会被当成 URL 的一部分吞掉,那两句就切不开(欠切,实测踩到过)。
+    re.compile(r'\b(?:[A-Za-z0-9-]+\.)+(?:com|org|net|io|co|ai|dev|app|edu|gov|so|me|fm)\b'
+               r'(?:/[A-Za-z0-9_\-./~%?&=#]*[A-Za-z0-9_\-/~%=#])?'),
+    re.compile(r'\b\d+(?:\.\d+)+\b'),                                  # 2.0 / 4.0 / 1.5.3
+    re.compile(r'\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc|Inc|Ltd|Fig|No|Vol)\.'),
+    re.compile(r'\b(?:e\.g|i\.e|a\.m|p\.m|U\.S|U\.K|Ph\.D)\.', re.I),
+    re.compile(r'\b(?:[A-Za-z]\.){2,}'),                               # A.I. / E.P.P.O.
+]
+# 用「插哨兵再 split」而不是「直接 split」:分隔符若写成 `(?<=[.!?])["\')\]]*\s+`,
+# 那个 `["\')\]]*` 会被当成分隔符**消费掉**,`He said, "this is it." Then...` 的收尾引号
+# 就没了 —— 而且**词数闸查不出来**(丢一个引号不改变词数)。所以把标点留在前一句里。
+_SENT_END = re.compile(r'([.!?]["\')\]]*)\s+(?=["\'(\[]?[A-Z0-9])')
+
+
+def split_sentences(text):
+    """把一段切成句子:先把 URL / 小数 / 缩写藏起来再切,切完还原。"""
+    text = (text or "").strip()
+    if not text:
+        return []
+    vault = []
+
+    def stash(m):
+        vault.append(m.group(0))
+        return f"\x00{len(vault) - 1}\x00"
+
+    for pat in _PROTECT:
+        text = pat.sub(stash, text)
+    # 注意 replacement 里不能写 r'\1\x01' —— 原始串里的 `\x` 会被 re 的模板解析器拒掉
+    # (bad escape \x)。用 lambda 直接拼,绕开模板转义。
+    marked = _SENT_END.sub(lambda m: m.group(1) + '\x01', text)
+    parts = [s.strip() for s in marked.split('\x01') if s.strip()]
+    return [re.sub(r'\x00(\d+)\x00', lambda m: vault[int(m.group(1))], s) for s in parts]
+
+
+def build(p, tr, split=True):
     segs = json.loads(get(tr["cdn_url"], binary=True))
     smap = tr.get("speaker_map") or {}
 
@@ -158,11 +197,12 @@ def build(p, tr):
         txt = (s.get("text") or "").strip()
         if not txt:
             continue
+        pieces = split_sentences(txt) if split else [txt]
         st = float(s.get("start") or 0)
         if turns and turns[-1]["speaker"] == who:
-            turns[-1]["sents"].append(txt)
+            turns[-1]["sents"].extend(pieces)
         else:
-            turns.append({"speaker": who, "start": st, "sents": [txt]})
+            turns.append({"speaker": who, "start": st, "sents": pieces})
 
     named = sorted({t["speaker"] for t in turns})
     placeholder = [n for n in named if re.fullmatch(r'(SPEAKER_\d+|Speaker \d+)', n)]
@@ -180,6 +220,8 @@ def build(p, tr):
         "segments": len(segs),
         "turns": len(turns),
         "words": words,
+        "sentences": sum(len(t["sents"]) for t in turns),
+        "sentence_split": True,
         "transcription_status": tr.get("status"),
     }
     return segs, turns, meta
@@ -198,6 +240,8 @@ def main():
     ap.add_argument("--search", help="按标题/嘉宾名在归档里搜 slug(只列候选,不下载)")
     ap.add_argument("--pub", default="www.lennysnewsletter.com", help="Substack 域名")
     ap.add_argument("--workdir", default=".", help="产物输出目录")
+    ap.add_argument("--no-split", action="store_true",
+                    help="不切句,turns[].sents 保留官方分段原样(默认切句,句级对照需要)")
     a = ap.parse_args()
 
     if a.search:
@@ -226,7 +270,7 @@ def main():
 
     print(f"→ post: {url}   (来源: {src})")
     p, tr = extract(url)
-    segs, turns, meta = build(p, tr)
+    segs, turns, meta = build(p, tr, split=not a.no_split)
     meta["resolved_from"] = src
 
     os.makedirs(a.workdir, exist_ok=True)
@@ -245,7 +289,8 @@ def main():
     if meta["unnamed_speakers"]:
         print(f"  ⚠ 未命名 {meta['unnamed_speakers']} —— speaker_map 没给名字,"
               f"PREP 需要按 description 认人(别瞎猜,认不出就退化)")
-    print(f"  规模     {meta['segments']} 段 → {meta['turns']} turn · {meta['words']:,} 词")
+    nsent = sum(len(t["sents"]) for t in turns)
+    print(f"  规模     {meta['segments']} 段 → {meta['turns']} turn / {nsent} 句 · {meta['words']:,} 词")
     print(f"✓ 写入 {a.workdir}/substack_{{transcript.json,turns.json,transcript.txt,meta.json}}")
     return 0
 

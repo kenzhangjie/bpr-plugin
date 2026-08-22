@@ -135,13 +135,33 @@ python3 scripts/fetch/fetch_substack_transcript.py \
   `limit` 上限 50、`search`/`type`/`section` 参数**全部不生效**,别指望它);
   再不行去 https://www.lennysnewsletter.com/podcast/archive 手动找。
 
-产物 `substack_turns.json` 是 `[{"speaker","start","sents":[...]}]`,**直接满足 PREP 英文
-子模式的产出契约**(见 `prep-and-modes.md`)——这一步成功就**跳过逐窗说话人归属子代理**。
+产物 `substack_turns.json` 是 `[{"speaker","start","sents":[...]}]`,已按句切好,
+**直接满足 PREP 英文子模式的产出契约**(见 `prep-and-modes.md`)——这一步成功就
+**跳过逐窗说话人归属子代理**。切句用脚本自带的 `split_sentences()`,URL / 小数 / 缩写
+先屏蔽再切(`cursor.com` / `2.0` / `$1,000` 不会被切断),字符级无损。
+想保留官方原始分段就加 `--no-split`。
 
-> 用哪边的英文正文?**两边都行,但只能选一边**。官方稿断句更规整、自带 speaker;
-> YouTube 轨与视频时间轴严格对齐。混用会让句索引对不上。默认取官方稿;
-> 已经用 YT 轨跑完的,可以只把官方 speaker 对齐回去(用 `difflib.SequenceMatcher`
-> 对规范化词序列做映射,**别用累计词数硬对齐——两边词数差几个,漂移会假报十几处分歧**)。
+### 用哪边的英文正文?**默认官方稿**(2026-08-23 定)
+
+拿到官方稿就**用它当正文**,不要再用 YouTube 字幕轨。两边**只能选一边**——
+混用会让句索引对不上。
+
+| 维度 | 官方稿 | YouTube 字幕轨 |
+|---|---|---|
+| **说话人** | ✅ `speaker_map` 真名字,含第三说话人 | ❌ 没有,只能启发式二分 |
+| **URL / 小数** | ✅ `cursor.com` `2.0` `$1,000` 完好 | ❌ 滚动字幕拼接后要自己切句,实测切坏 8 处 |
+| **段边界** | ✅ 干净,92% 已是单句 | ❌ 需要从 VTT 重建 |
+| **专名** | ⚠️ **和 YT 一样烂** | ⚠️ 一样烂 |
+| 时间轴 | 音频时间(与视频差片头几秒) | 与视频严格对齐 |
+
+> ⚠️ **别以为官方稿的专名更准 —— 它也是机器转录的。** 同一期实测:官方稿里
+> `Code Pilot`×3、`Instruct GPT`、`Dolly`、`stable diffusion` **一个不少**,错法与 YT 轨
+> 完全一致。所以 **PREP 的 glossary 扫描 + 专名纠错这一层照跑不误**,只有说话人归属
+> 那一层可以省。省错了会静默出一篇专名全错的稿子。
+
+**已经用 YT 轨跑完、只想补 speaker 的**:用 `difflib.SequenceMatcher` 对规范化词序列
+做映射再回填。**别用累计词数硬对齐**——两边词数差十几个,漂移会把 3% 的真实分歧
+假报成 12%(2026-08-23 实测踩过)。
 
 **Step C · 用 metadata 识别 host / guest**
 
