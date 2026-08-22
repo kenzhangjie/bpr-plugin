@@ -77,6 +77,13 @@
 
 ## 主持人 / 嘉宾(podcast 模式)
 
+- [ ] **Substack 播客:跑过 `fetch_substack_transcript.py` 了吗?**(2026-08-23 加)
+      成功 → `.speaker` 用官方 `speaker_map` 的真名字;退出码 3 → 在报告里**明说**
+      "说话人为启发式推断,未与官方标注对账"。
+- [ ] **第三个说话人查过没有**:赞助商口播嘉宾 / 联合主持 / 第二嘉宾。
+      启发式只会二分 host/guest,**整段并进主持人也不会掉任何一个闸**
+      ——覆盖闸只问词丢没丢,加译闸只问词多没多,**没有闸在问"这句是谁说的"**。
+      渲染时第三方用 `data-role="sponsor"`(base.html 已有配色,与 host/guest 都区分得开)。
 - [ ] 主持人和嘉宾都在原文里**找到了**(不是猜的、不是默认的)
 - [ ] Hero kicker 里的姓名 = transcript 里实际出现的姓名,**没有默认 Lenny**
 - [ ] **podcast slug 匹配实际节目**(参 `lessons-learned.md` L1 的 slug 表),不允许泛指 `podcast` / `interview`

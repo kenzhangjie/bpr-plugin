@@ -271,6 +271,8 @@
       letter-spacing:.04em; color:var(--accent);
     }
     .speaker[data-role="host"]{color:var(--ink-soft)}
+    /* 第三方说话人(赞助商嘉宾 / 联合主持 / 第二嘉宾):跟 host/guest 都要区分得开 */
+    .speaker[data-role="sponsor"],.speaker[data-role="third"]{color:var(--ink-faint)}
     .timestamp{
       font-family:var(--sans); font-size:11px;
       color:var(--ink-faint); letter-spacing:.05em;

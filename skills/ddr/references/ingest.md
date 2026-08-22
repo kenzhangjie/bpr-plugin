@@ -112,6 +112,37 @@ scripts/fetch/fetch_youtube.sh "<URL>" "$WORKDIR"
 - `metadata.json` — 标题 / uploader(频道)/ 上传日期 / 描述 / 时长 / tags
 - `transcript.*.vtt` — 原始 vtt(留作 debug,不动)
 
+**Step B2 · 有没有官方文字稿?(Substack 播客必查,2026-08-23 加)**
+
+YouTube 字幕轨**没有说话人标注**,英文 PREP 只能靠"提问方 = 主持人"推。实测一期 Lenny
+访谈:推对 567/584 = **97.1%**,错的 17 句里 **12 句是第三个说话人**(赞助商口播嘉宾
+Andrew Luo)——这种人靠启发式**结构性推不出来**,只会被整段并进主持人。
+
+**Lenny's Podcast / 任何 Substack 托管的播客**,官方文字稿里直接有 `speaker_map`。跑:
+
+```bash
+python3 scripts/fetch/fetch_substack_transcript.py \
+  --from-youtube "$WORKDIR/metadata.json" --workdir "$WORKDIR"
+```
+
+- 脚本从 `metadata.json` 的 description 里认 `*Transcript:* https://.../p/<slug>` 那一行
+  (Lenny 每期都有,而且是**第一个** `/p/` 链接;后面的是 Referenced 往期节目)。
+- **付费期次照样能拿**:`audience=only_paid` 时页面正文被墙,但签名 CDN 链接
+  (`post.podcastUpload.transcription.cdn_url`)仍嵌在公开 HTML 里。实测 4 期(3 期付费)全成。
+- 退出码 `3` = 该 post 不是播客 / 还没转录完 → **老老实实退回 YouTube 字幕 + 启发式归属**,
+  别硬凑。
+- 找不到 slug 时:`--search "<嘉宾名>"` 列候选(只覆盖较近期次,archive API 的
+  `limit` 上限 50、`search`/`type`/`section` 参数**全部不生效**,别指望它);
+  再不行去 https://www.lennysnewsletter.com/podcast/archive 手动找。
+
+产物 `substack_turns.json` 是 `[{"speaker","start","sents":[...]}]`,**直接满足 PREP 英文
+子模式的产出契约**(见 `prep-and-modes.md`)——这一步成功就**跳过逐窗说话人归属子代理**。
+
+> 用哪边的英文正文?**两边都行,但只能选一边**。官方稿断句更规整、自带 speaker;
+> YouTube 轨与视频时间轴严格对齐。混用会让句索引对不上。默认取官方稿;
+> 已经用 YT 轨跑完的,可以只把官方 speaker 对齐回去(用 `difflib.SequenceMatcher`
+> 对规范化词序列做映射,**别用累计词数硬对齐——两边词数差几个,漂移会假报十几处分歧**)。
+
 **Step C · 用 metadata 识别 host / guest**
 
 ```bash

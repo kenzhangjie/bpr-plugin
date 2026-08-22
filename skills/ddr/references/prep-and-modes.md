@@ -21,6 +21,16 @@ YouTube 只拿到 auto-subs(无标点、无 speaker)时,PREP 先做退化处理�
 ### 触发条件
 **CJK < 60%**(判定见下「语言检测算法」)且输入是 **transcript 类**(有 `>>` 或 speaker 信号)。**essay(单作者、无说话人轮换的博客/长文)跳过本节**,直接走原有 PREP 流程。
 
+> ⏭ **先看有没有官方 speaker 标注**(2026-08-23 加):INGEST 的 Step B2 若跑成
+> `fetch_substack_transcript.py`,`substack_turns.json` 已经是本节的产出契约格式
+> ——**Step 2 的逐窗说话人归属子代理整段跳过**,只保留 Step 1 的 glossary 扫描
+> (专名纠错仍要做)。省掉 10 个子代理,而且拿到的是**真名字不是推断**。
+>
+> 为什么值得专门加这一步:启发式"提问方 = 主持人"只能二分 host/guest。实测一期
+> Lenny 访谈里,赞助商口播嘉宾整段 12 句被并进主持人,**覆盖闸和加译闸都查不出来**
+> ——它们只问"词有没有丢/有没有多",不问"这句是谁说的"。归属错误在本流水线里
+> **没有任何自动闸能兜**,只能靠源头拿到真标注。
+
 对应脚本:
 - `scripts/prep/clean_en.py` —— 切窗 / 拼装 / 闸门(`parse_blocks` / `split_windows` /
   `word_coverage` / `added_ratio` / `finalize` + CLI)

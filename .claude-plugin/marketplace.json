@@ -13,7 +13,7 @@
       "name": "ddr",
       "source": "./",
       "description": "把 podcast/transcript/字幕/博客 essay 转成编辑设计风格的阅读 HTML。英文双语,中文 TL;DR+非共识+章节回顾。支持 YouTube/小宇宙/Bilibili 输入",
-      "version": "2.0.1",
+      "version": "2.1.0",
       "author": {
         "name": "kenzhangjie",
         "email": "ken.zhangjie@gmail.com"
