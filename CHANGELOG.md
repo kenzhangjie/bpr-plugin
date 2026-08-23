@@ -5,6 +5,65 @@ All notable changes to this plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.2.0 — 2026-08-23
+
+**Substack 官方文字稿升为英文正文的默认源。** v2.1.0 只把它当"补 speaker 的旁路",
+实测下来它该当正文:URL / 小数 / `$1,000` 全完好(YT 滚动字幕拼接后要自己切句,
+那次切坏 8 处),段边界干净、92% 已是单句。
+
+### Added
+
+- `fetch_substack_transcript.py` 加 `split_sentences()`:切句前先屏蔽 URL / 小数 /
+  缩写,切完还原。543 段 → 586 句,与从 YT 轨那条路切出来的句数一致(交叉验证),
+  字符级无损。`--no-split` 保留官方原始分段。
+
+### Fixed
+
+- 切句的两个 bug(均已在代码里留注释说明为什么):
+  - URL 路径允许以 `.` 收尾 → 吞掉句末句号,`vanta.com/lenny. That's ...` 欠切。
+  - 分隔符写成 `(?<=[.!?])["\')\]]*\s+` → `split` 把收尾引号当分隔符**消费掉**,
+    `He said, "this is it."` 丢了收尾引号。**词数闸查不出来**(丢一个引号不改变词数),
+    是专门写引号 case 才撞出来的。
+
+### Changed
+
+- SKILL.md / `ingest.md` / `prep-and-modes.md` 把英文正文默认源改成官方稿,并列了一张
+  "哪些强哪些不强"的对照表。
+
+### 纠正 v2.1.0 文档里的一句话
+
+**官方稿不比 YouTube 字幕轨专名准。** 同一期实测,官方稿里 `Code Pilot`×3 /
+`Instruct GPT` / `Dolly` / `stable diffusion` 一个不少,错法与 YT 轨**完全一致**
+—— 它也是机器转录的(`status=transcribed` + `modal_call_id`)。"官方"只保证**说话人**
+和**断句**。所以 PREP 的 glossary 扫描 + 专名纠错**照跑不误**,只有说话人归属那一层能省。
+上述三个文件都写明了这一点,避免下次顺手把整个专名纠错层一起省掉。
+
+## v2.1.0 — 2026-08-23
+
+**新增 Substack 播客官方文字稿抓取(带 `speaker_map`)。** YouTube 字幕轨没有说话人标注,
+英文 PREP 只能靠"提问方 = 主持人"二分推断。Lenny × Michael Truell 那期实测推对
+567/584 = 97.1%,但错的 17 句里 **12 句是第三个说话人**(赞助商口播嘉宾)整段被并进主持人
+—— 二分启发式**结构性**推不出第三人,而这类错误**现有的闸一个都拦不住**:覆盖闸只问词丢没丢、
+加译闸只问词多没多,没有任何闸在问"这句是谁说的"。
+
+### Added
+
+- `skills/ddr/scripts/fetch/fetch_substack_transcript.py`:
+  - 从 `window._preloads` 取 `post.podcastUpload.transcription`;
+    `speaker_map` 给官方说话人真名,`cdn_url` 给分段全文 + 词级时间戳。
+  - **付费期次(`audience=only_paid`)照样拿得到** —— 正文被墙,`transcription.json` 不被墙。
+  - 三条入口:`--from-youtube`(读 description 里的 `Transcript:` 行,最稳)/ 直接给 post URL / `--search`。
+  - 退出码 3 = 不是播客或未转录完 → 明确退回 YouTube 字幕 + 启发式,不硬凑。
+  - 实测 4 期(3 期 `only_paid`)全部成功,12,874–13,221 词。
+- `templates/base.html` 加 `data-role="sponsor"` / `"third"` 配色 —— 原模板只有
+  host / guest 二分,拿到真的第三说话人也没法渲染得有区分度。
+- `verify.md` 加"第三个说话人查过没有"检查项,并写明它为什么掉不进任何自动闸。
+
+### 记录的坑
+
+- Substack `/api/v1/archive` 的 `search` / `type` / `section` 参数**全部不生效**,
+  `limit` 上限 50 —— 别指望用它检索,老期次只能靠 description 链接或 `/podcast/archive`。
+
 ## v2.0.1 — 2026-08-18
 
 **把 v2.0.0 里刻意留下的两个旧名也改了：仓库 `bpr-plugin` → `ddr-plugin`，marketplace
