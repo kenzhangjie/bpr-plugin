@@ -1,9 +1,9 @@
 ---
 name: ddr
-description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长文 article 转换为编辑设计风格的阅读 HTML。**英文**素材默认双语对照;**中文**素材自动切换到 "TL;DR + 非共识 + 章节回顾" 浓缩模式(CJK ≥ 60% 自动判定)。当用户输入 "/ddr" 后跟字幕、transcript、播客文本、博客 URL 或粘贴的长文,或明确要求"双语阅读器"/"podcast 整理"/"博客整理"时触发。覆盖 SRT、纯文本 transcript、有时间戳的 transcript、博客/essay 四种内容;URL 输入支持 YouTube / 小宇宙 / Bilibili。输出单文件 HTML,包含 Hero、TL;DR、(中文模式) 非共识 takes、章节正文、目录、深色模式。
+description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长文 article 转换为编辑设计风格的阅读 HTML。**英文**素材默认双语对照;**中文**素材自动切换到"TL;DR + 非共识 + 全文书面正文 + 可折叠逐字底档"(CJK ≥ 60% 自动判定,**不是摘要**)。当用户输入 "/ddr" 后跟字幕、transcript、播客文本、博客 URL 或粘贴的长文,或明确要求"双语阅读器"/"podcast 整理"/"博客整理"时触发。覆盖 SRT、纯文本 transcript、有时间戳的 transcript、博客/essay 四种内容;URL 输入支持 YouTube / 小宇宙 / Bilibili。输出单文件 HTML(**本地文件,不自动发布** —— 发布到 bpr.ken.solar 走 `/bpr`),包含 Hero、TL;DR、(中文模式) 非共识 takes、章节正文、目录、深色模式。
 ---
 
-# DDR · Deep Dive Reading（双语精读 / 中文浓缩）
+# DDR · Deep Dive Reading（双语精读 / 中文全文）
 
 ## 触发条件
 - 用户输入 `/ddr <内容>` 或 `/ddr` 后跟 transcript / 博客 URL / 长文文本 → 出 HTML
@@ -11,20 +11,35 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 - 用户上传字幕文件并要求"做成双语阅读器"
 - 用户明确说"按 DDR 规则"
 
-## 流水线 · 8 阶段
+## 流水线 · 7 阶段
 
 按顺序走。每个阶段到达时才读对应 reference(省 context),不要一开始读完所有。
 
 | 阶段 | 做什么 | 读哪个 reference / 用哪个脚本 |
 |---|---|---|
 | **1 · INGEST** | 解析输入:URL 预处理 + 提取发布日期/标题/作者;判输入类型(SRT / 带时间戳 transcript / 纯文本 transcript / blog essay)。文件名也在此阶段按元信息定。 | `references/ingest.md`(URL 处理 / 发布日期 / 文件名规则)· `scripts/fetch/*`(含 `extract_pdf.py` 本地 PDF) |
-| **2 · PREP** | 预处理:合并跨条句、提取说话人、标注时间戳、auto-subs 重断句+加标点、VTT 滚动重建;**统计 CJK 占比 → 选模式**(≥60% 中文浓缩 / <60% 英文双语)。**英文子模式**:用 `description` 当 ground truth 做专名纠错 + 说话人归属 + 拆合并 `>>`(见 prep-and-modes.md);中文走 CLEAN。 | `references/prep-and-modes.md`(断句 + 中文模式判定与规范)· `scripts/fetch/clean_vtt.py` |
+| **2 · PREP** | 预处理:合并跨条句、提取说话人、标注时间戳、auto-subs 重断句+加标点、VTT 滚动重建;**统计 CJK 占比 → 选模式**(≥60% 中文全文 / <60% 英文双语)。**英文子模式**:用 `description` 当 ground truth 做专名纠错 + 说话人归属 + 拆合并 `>>`(见 prep-and-modes.md);中文走 CLEAN。 | `references/prep-and-modes.md`(断句 + 中文模式判定与规范)· `scripts/fetch/clean_vtt.py` |
 | **3 · CLEAN** | **(仅中文模式)** ASR 后处理三步:Analyze 全稿定术语表+存疑清单 → 按 ~25 turn 切窗,子代理 Review(纠错)+ Polish(书面化)→ 产出书面正文,保留逐字底档。**各窗必须并发派发(批 ≤ 5),保真闸抽样**。英文模式跳过。 | `references/clean.md` |
 | **4 · STRUCTURE** | 章节切分 + 提炼 TL;DR(描述性 h2)+(中文模式)🔥 非共识 takes。规模按下方"自适应"表。 | `references/render.md`(TL;DR 4 元素 / 中文 2 元素格式)· 下方自适应表 |
 | **5 · TRANSLATE** | **仅英文双语模式**跑。逐句翻译走**四步法** + 逐字全覆盖 + 中文去口语词(两条硬约束)。中文模式跳过。 | **`references/translate.md`(必读:四步法 + 逐字 + 去口语词)** |
 | **6 · RENDER** | 用 `templates/base.html` 骨架建 HTML(双语对照 / essay / 中文书面正文+可折叠底档 三种版型)。`enrich` 子动作:essay 跑正文图自托管、podcast 注入时间戳。 | `references/render.md`(版型 / inline link / hero-meta 来源行)· `scripts/enrich/{extract_images,add_timestamps}.py` |
 | **7 · VERIFY** | 质量自检:英文双语走句数覆盖闸(不足回 TRANSLATE 补);中文 CLEAN 走实体覆盖闸(不足回 CLEAN 补)。详见 verify.md。 | `references/verify.md` |
-| **8 · PUBLISH** | 重建 landing index → 部署 bpr.ken.solar(proxy 直连)。 | `references/publish.md`(产物约定 + 部署)· `scripts/publish/build_index.py` |
+
+### 产出:本地文件,不发布
+
+HTML 写到 `~/Library/Mobile Documents/com~apple~CloudDocs/Claude/Transcript/<stem>.html`。
+
+**VERIFY 通过后到此为止 —— DDR 不部署。** 结尾必须打印:
+
+```
+✅ 已生成  <绝对路径>
+   要发布到 bpr.ken.solar,跑  /bpr
+```
+
+> **为什么拆开**(2026-08-29):转换和发布是两件该分开决定的事 —— 你可能想攒几篇
+> 一起发、想改完某篇单独重发、想只更新 landing 而不加新文章。绑在一条流水线里
+> 这三件都做不了。发布侧的四个坑(INDEX.html 大小写 / iCloud 占位符 / proxy 直连 /
+> index 哈希对不上)全部搬去了 `bpr` skill。
 
 > **海报分支已于 1.7.3 移除**:上线两个多月、120 篇产出里 **0 张海报**,而它占着
 > 207 行 reference + 879 行模板 + 一个脚本,每次读 SKILL.md 都得绕过它。
@@ -39,7 +54,6 @@ description: 把 podcast transcript / 字幕 / 访谈文本 / 博客 essay / 长
 > ⚠️ **专名纠错照跑** —— 官方稿也是机器转录的,错法与 YT 轨一模一样,"官方"只保证说话人和断句。
 > 实测数字见 `references/ingest.md` Step B2。
 > **模式判定**:CJK ≥ 60% → 中文模式,**完全自动**,不接受修饰词覆盖(见 `references/prep-and-modes.md`)。
-> **发布大小写坑**:Transcript 目录若有遗留 `INDEX.html`(大写),会导致 bpr.ken.solar 404 —— `rm INDEX.html` 再跑 build_index(见 `references/publish.md`)。
 
 ## 自适应规模
 

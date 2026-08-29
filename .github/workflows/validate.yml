@@ -45,40 +45,44 @@ jobs:
           print(f'✓ versions in sync: {plugin_v}')
           "
 
-      - name: Validate SKILL.md frontmatter
+      - name: Validate SKILL.md frontmatter (all skills)
         run: |
           python3 -c "
-          import re, yaml, sys
-          content = open('skills/ddr/SKILL.md').read()
-          m = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
-          assert m, 'SKILL.md missing YAML frontmatter'
-          fm = yaml.safe_load(m.group(1))
-          for k in ('name', 'description'):
-              assert k in fm, f'SKILL.md frontmatter missing key: {k}'
-          print(f'✓ SKILL.md frontmatter OK (name={fm[\"name\"]})')
+          import re, yaml, sys, pathlib
+          for sk in sorted(p.name for p in pathlib.Path('skills').iterdir() if p.is_dir()):
+              content = open(f'skills/{sk}/SKILL.md').read()
+              m = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
+              assert m, f'skills/{sk}/SKILL.md missing YAML frontmatter'
+              fm = yaml.safe_load(m.group(1))
+              for k in ('name', 'description'):
+                  assert k in fm, f'skills/{sk}/SKILL.md frontmatter missing key: {k}'
+              assert fm['name'] == sk, f'skills/{sk}: frontmatter name={fm[\"name\"]} != dir name'
+              print(f'✓ skills/{sk}/SKILL.md frontmatter OK')
           "
 
       - name: Validate referenced files exist (no dangling references)
         run: |
           python3 -c "
-          import re, os, sys
+          import re, os, sys, pathlib
           errors = []
-          # Check SKILL.md references to references/, scripts/, templates/
-          content = open('skills/ddr/SKILL.md').read()
-          # Find paths like references/foo.md, scripts/bar.sh, templates/x.html
-          referenced = re.findall(r'(?:references|scripts|templates)/[\w\-/.]+\.(?:md|sh|py|html)', content)
-          referenced = sorted(set(referenced))
-          base = 'skills/ddr/'
-          for path in referenced:
-              full = os.path.join(base, path)
-              if not os.path.exists(full):
-                  errors.append(f'  - SKILL.md references missing: {path}')
+          total = 0
+          for sk in sorted(p.name for p in pathlib.Path('skills').iterdir() if p.is_dir()):
+              base = f'skills/{sk}/'
+              for f in pathlib.Path(base).rglob('*.md'):
+                  content = f.read_text()
+                  # 负向后顾:跳过 \$DDR_SKILL/scripts/... 和 skills/ddr/scripts/... 这类跨 skill 引用,
+                  # 只校验本 skill 内的相对引用
+                  referenced = sorted(set(re.findall(r'(?<![/\w\\\"\$])(?:references|scripts|templates)/[\w\-/.]+\.(?:md|sh|py|html)', content)))
+                  total += len(referenced)
+                  for path in referenced:
+                      if not os.path.exists(os.path.join(base, path)):
+                          errors.append(f'  - {f}: references missing {path}')
           if errors:
-              print('✗ Dangling references in SKILL.md:')
+              print('✗ Dangling references:')
               for e in errors:
                   print(e)
               sys.exit(1)
-          print(f'✓ All {len(referenced)} referenced files exist in skills/ddr/')
+          print(f'✓ All {total} referenced paths resolve inside their own skill')
           "
 
       - name: Check no hardcoded user paths leaked

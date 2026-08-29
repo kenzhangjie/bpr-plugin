@@ -60,8 +60,8 @@ ddr-plugin/
 │   ├── workflows/validate.yml         ← CI: JSON / frontmatter / 引用完整性校验
 │   ├── ISSUE_TEMPLATE/{bug,feature}.yml
 │   └── pull_request_template.md
-├── skills/ddr/
-│   ├── SKILL.md                       ← 8 阶段主流程(只做路由,到站才读 reference)
+├── skills/ddr/                        ← 转换:素材 → 本地 HTML
+│   ├── SKILL.md                       ← 7 阶段主流程(只做路由,到站才读 reference)
 │   ├── references/                    ← 按阶段一份
 │   │   ├── ingest.md                  ← 1 URL 处理 / 抓取 / 发布日期
 │   │   ├── prep-and-modes.md          ← 2 断句 / 说话人 / 中英模式判定
@@ -69,7 +69,6 @@ ddr-plugin/
 │   │   ├── render.md                  ← 6 版型 / 设计系统
 │   │   ├── translate.md               ← 5 翻译四步法
 │   │   ├── verify.md                  ← 7 输出前自检清单
-│   │   ├── publish.md                 ← 8 产物约定 / 部署
 │   │   └── lessons-learned.md         ← 历史踩坑总结(只增不改)
 │   ├── scripts/
 │   │   ├── fetch/                     ← yt-dlp / 小宇宙 / B站 / PDF / 元数据
@@ -81,6 +80,9 @@ ddr-plugin/
 │   ├── templates/
 │   │   └── base.html                  ← 双语 HTML 骨架
 │   └── tests/                         ← pytest(152 例)
+├── skills/bpr/                        ← 发布:本地 HTML → bpr.ken.solar
+│   ├── SKILL.md                       ← 四步:守卫 / 索引 / 部署 / 校验
+│   └── references/deploy.md           ← 完整命令 + 排错
 ├── examples/                          ← 真实输出样例(社区贡献)
 ├── tools/release.sh                   ← 一键发版脚本(maintainer 用)
 ├── README.md

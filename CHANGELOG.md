@@ -5,6 +5,43 @@ All notable changes to this plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this plugin adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.3.0 — 2026-08-29
+
+**拆分:`/ddr` 只转换,`/bpr` 只发布。** 转换和发布是两件该分开决定的事 ——
+攒几篇一起发、改完某篇单独重发、只更新 landing 不加新文章,这三件绑在一条
+流水线里都做不了。
+
+### Added
+
+- **新 skill `bpr`**(同一个 plugin,`skills/bpr/`):`/bpr` 重建 index + 部署 + 校验 ·
+  `/bpr index` 只重建不发 · `/bpr verify` 只校验。
+- `references/deploy.md` 补齐**部署后校验**一步(原 publish.md 只到部署为止):
+  root / 文章页状态码、文章页对哈希、index.html 只查语义。
+- 补进两条此前只在记忆里的坑:
+  - **iCloud 同步暂停时 `brctl download` 会静默失效**,照样传空文件 → 部署前
+    `pgrep -x bird` 确认。
+  - **index.html 不能比哈希** —— `vercel.json` 的 `buildCommand` 让 Vercel 每次
+    部署都在自己那边重跑索引生成,线上那份不是你上传的那份。
+
+### Changed
+
+- **DDR 流水线 8 阶段 → 7 阶段**,删掉 PUBLISH。VERIFY 通过后打印本地路径 +
+  `要发布跑 /bpr`。
+- `skills/ddr/references/publish.md` → `skills/bpr/references/deploy.md`。
+- `plugin.json` 的 `skills` 数组加 `./skills/bpr`(**漏了这行新 skill 不会被加载**)。
+
+### Fixed — 文档与实现脱节
+
+**SKILL.md 的描述still写着中文走"浓缩模式",但实现早在 2026-07-22 就改了。**
+`prep-and-modes.md` 当时明确写的是「顶部给速读笔记,正文给书面稿,底层留逐字底档,
+**不是**把整集压成摘要」,旧的 `.ch-summary` 200-400 字浓缩版型也已弃用 ——
+只有 SKILL.md 的 frontmatter 和标题没跟着改,导致读描述的人以为中文模式还在做摘要。
+
+- frontmatter:`"TL;DR + 非共识 + 章节回顾" 浓缩模式` → `"TL;DR + 非共识 +
+  全文书面正文 + 可折叠逐字底档"(**不是摘要**)`
+- 标题:`中文浓缩` → `中文全文`;阶段 2 行内的 `≥60% 中文浓缩` 同步改掉
+- frontmatter 补明**产出是本地文件,不自动发布**
+
 ## v2.2.0 — 2026-08-23
 
 **Substack 官方文字稿升为英文正文的默认源。** v2.1.0 只把它当"补 speaker 的旁路",
